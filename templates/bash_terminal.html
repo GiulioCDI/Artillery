@@ -467,25 +467,6 @@
                         </div>
                     </div>
                 `).join('');
-
-                // Add event delegation for script buttons
-                document.querySelectorAll('.script-item').forEach(item => {
-                    const filename = item.dataset.filename;
-                    item.addEventListener('click', (e) => {
-                        if (!e.target.closest('button')) {
-                            selectScript(filename);
-                        }
-                    });
-                    item.querySelectorAll('button').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            const action = btn.dataset.action;
-                            if (action === 'run') executeScript(filename, e);
-                            else if (action === 'edit') editScript(filename, e);
-                            else if (action === 'delete') deleteScript(filename, e);
-                        });
-                    });
-                });
             })
             .catch(err => {
                 const list = document.getElementById('scripts_list');
@@ -968,6 +949,25 @@
             appendTerminalOutput(`Resuming ${execIds.length} running script(s)...`, 'text-info');
             execIds.forEach(id => pollAsyncStatus(id));
         }
+
+        // Set up event delegation for script list (one-time setup)
+        document.getElementById('scripts_list').addEventListener('click', (e) => {
+            const scriptItem = e.target.closest('.script-item');
+            if (!scriptItem) return;
+            
+            const filename = scriptItem.dataset.filename;
+            const button = e.target.closest('button');
+            
+            if (button) {
+                e.stopPropagation();
+                const action = button.dataset.action;
+                if (action === 'run') executeScript(filename, e);
+                else if (action === 'edit') editScript(filename, e);
+                else if (action === 'delete') deleteScript(filename, e);
+            } else {
+                selectScript(filename);
+            }
+        });
 
         loadScripts();
         loadFileBrowser();
