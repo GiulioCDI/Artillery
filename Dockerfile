@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 # Install cron and gosu properly (from official gosu install script)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends cron wget ca-certificates \
+    && apt-get install -y --no-install-recommends cron wget ca-certificates b3sum util-linux \
     && rm -rf /var/lib/apt/lists/* \
     && set -eux; \
     GOSU_VERSION=1.17; \
@@ -22,7 +22,7 @@ COPY . .
 
 RUN chmod +x /app/entrypoint.sh
 
-VOLUME ["/config", "/tasks", "/downloads"]
+VOLUME ["/config", "/tasks", "/downloads", "/scripts"]
 
 ENV FLASK_APP=app.py \
     DATA_DIR=/data

@@ -18,6 +18,7 @@ from typing import Optional, Tuple
 
 import task_runtime as tr
 import mediawall_runtime as mw
+import bash_terminal_runtime as btr
 from config import Config
 
 from flask import (
@@ -60,6 +61,8 @@ app.logger.info(f"  Debug Requests: {DEBUG_REQUEST_TIMING}")
 app.logger.info(f"  Debug FS: {DEBUG_FS_TIMING}")
 app.logger.info(f"  Login Required: {cfg.login_required}")
 app.logger.info(f"  Media Wall Enabled: {cfg.media_wall_enabled}")
+app.logger.info(f"  Bash Terminal Enabled: {cfg.bash_terminal_enabled}")
+app.logger.info(f"  Bash Terminal Timeout: {cfg.bash_terminal_timeout}s")
 
 # ---------------------------------------------------------------------
 # Base data directories (shared with scheduler)
@@ -68,6 +71,9 @@ app.logger.info(f"  Media Wall Enabled: {cfg.media_wall_enabled}")
 TASKS_ROOT = str(cfg.tasks_dir)
 CONFIG_ROOT = str(cfg.config_dir)
 DOWNLOADS_ROOT = str(cfg.downloads_dir)
+BASH_TERMINAL_ENABLED = cfg.bash_terminal_enabled
+BASH_TERMINAL_TIMEOUT = cfg.bash_terminal_timeout
+BASH_TERMINAL_SCRIPT_DIR = str(cfg.bash_terminal_script_dir)
 
 CONFIG_FILE = tr.CONFIG_FILE
 ARTILLERY_CONFIG_FILE = os.path.join(CONFIG_ROOT, "artillery.conf")
@@ -78,15 +84,17 @@ IMAGE_EXTS = mw.IMAGE_EXTS
 VIDEO_EXTS = mw.VIDEO_EXTS
 MEDIA_EXTS = mw.MEDIA_EXTS
 
-# Update task_runtime and mediawall_runtime with validated paths
+# Update task_runtime, mediawall_runtime and bash_terminal_runtime with validated paths
 os.environ["TASKS_DIR"] = TASKS_ROOT
 os.environ["CONFIG_DIR"] = CONFIG_ROOT
 os.environ["DOWNLOADS_DIR"] = DOWNLOADS_ROOT
+os.environ["BASH_TERMINAL_SCRIPT_DIR"] = BASH_TERMINAL_SCRIPT_DIR
 
 # Re-import to pick up updated environment
 import importlib
 importlib.reload(tr)
 importlib.reload(mw)
+importlib.reload(btr)
 
 # Update references
 TASKS_ROOT = tr.TASKS_ROOT
@@ -184,6 +192,8 @@ def _is_safe_redirect(target: Optional[str]) -> bool:
 def inject_globals():
     return {
         "login_required": LOGIN_REQUIRED,
+        "bash_terminal_enabled": BASH_TERMINAL_ENABLED,
+        "bash_terminal_timeout": BASH_TERMINAL_TIMEOUT,
     }
 
 
@@ -364,6 +374,8 @@ def load_artillery_config() -> dict:
         "truncate_lines": True,  # default: enable line truncation
         "max_line_length": 200,  # default: max characters per line
         "media_wall_enabled": True,  # default: media wall enabled
+        "bash_terminal_enabled": True,  # default: bash terminal enabled
+        "terminal_font_size": 12,  # default: 12px font size
     }
     
     if os.path.exists(ARTILLERY_CONFIG_FILE):
@@ -396,6 +408,13 @@ def load_artillery_config() -> dict:
                                 app.logger.warning("Invalid max_line_length value '%s', using default", value)
                         elif key == "media_wall_enabled":
                             config["media_wall_enabled"] = value.lower() in ("true", "1", "yes", "on")
+                        elif key == "bash_terminal_enabled":
+                            config["bash_terminal_enabled"] = value.lower() in ("true", "1", "yes", "on")
+                        elif key == "terminal_font_size":
+                            try:
+                                config["terminal_font_size"] = int(value)
+                            except ValueError:
+                                app.logger.warning("Invalid terminal_font_size value '%s', using default", value)
         except Exception as exc:
             app.logger.warning("Failed to load Artillery config: %s", exc)
     
@@ -405,6 +424,7 @@ def load_artillery_config() -> dict:
 # Load persisted artillery configuration (overrides validated defaults where present)
 _artillery_config = load_artillery_config()
 MEDIA_WALL_ENABLED = _artillery_config.get("media_wall_enabled", MEDIA_WALL_ENABLED)
+BASH_TERMINAL_ENABLED = _artillery_config.get("bash_terminal_enabled", BASH_TERMINAL_ENABLED)
 
 
 def save_artillery_config(config: dict):
@@ -418,6 +438,8 @@ def save_artillery_config(config: dict):
             f.write(f"truncate_lines={'true' if config.get('truncate_lines', True) else 'false'}\n")
             f.write(f"max_line_length={config.get('max_line_length', 200)}\n")
             f.write(f"media_wall_enabled={'true' if config.get('media_wall_enabled', True) else 'false'}\n")
+            f.write(f"bash_terminal_enabled={'true' if config.get('bash_terminal_enabled', True) else 'false'}\n")
+            f.write(f"terminal_font_size={config.get('terminal_font_size', 12)}\n")
     except Exception as exc:
         app.logger.error("Failed to save Artillery config: %s", exc)
         raise
@@ -615,9 +637,27 @@ def mediawall_toggle():
     flash(f"Media wall {status}", "success")
     return redirect(url_for("config_page"))
 
-# ---------------------------------------------------------------------
+
+@app.route("/bash-terminal/toggle", methods=["POST"])
+def bash_terminal_toggle():
+    """Toggle bash terminal enabled/disabled."""
+    global BASH_TERMINAL_ENABLED
+    BASH_TERMINAL_ENABLED = not BASH_TERMINAL_ENABLED
+    status = "enabled" if BASH_TERMINAL_ENABLED else "disabled"
+    os.environ["BASH_TERMINAL_ENABLED"] = "1" if BASH_TERMINAL_ENABLED else "0"
+    
+    # Persist state to artillery.conf
+    config = load_artillery_config()
+    config["bash_terminal_enabled"] = BASH_TERMINAL_ENABLED
+    save_artillery_config(config)
+    
+    app.logger.info(f"Bash terminal {status}")
+    flash(f"Bash terminal {status}", "success")
+    return redirect(url_for("config_page"))
+
+# =====================================================================
 # Cached wall file route (fast: served from /config/media_wall)
-# ---------------------------------------------------------------------
+# =====================================================================
 
 @app.route("/wall/<path:filename>")
 def wall_file(filename):
@@ -1083,18 +1123,455 @@ def task_runs(slug):
     return jsonify({"slug": slug, "runs": runs})
 
 
-# ---------------------------------------------------------------------
+# =====================================================================
+# BASH TERMINAL ROUTES
+# =====================================================================
+
+@app.route("/terminal")
+def terminal_page():
+    """Render bash terminal page (feature must be enabled)."""
+    if not BASH_TERMINAL_ENABLED:
+        flash("Bash terminal feature is disabled", "error")
+        return redirect(url_for('tasks'))
+    
+    config = load_artillery_config()
+    terminal_font_size = config.get('terminal_font_size', 12)
+    return render_template('bash_terminal.html', terminal_font_size=terminal_font_size)
+
+
+@app.route("/api/terminal/font-size", methods=["POST"])
+def terminal_set_font_size():
+    """Save terminal font size preference."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    font_size = data.get("font_size", 12)
+    
+    # Validate: 8-20px
+    try:
+        font_size = int(font_size)
+        if font_size < 8 or font_size > 20:
+            return jsonify({"error": "Font size must be between 8 and 20"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid font size"}), 400
+    
+    # Save to config
+    config = load_artillery_config()
+    config["terminal_font_size"] = font_size
+    save_artillery_config(config)
+    
+    return jsonify({"message": f"Terminal font size set to {font_size}px"})
+
+
+@app.route("/api/terminal/execute", methods=["POST"])
+def terminal_execute():
+    """Execute a bash command and return output."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    command = data.get("command", "").strip()
+    cwd = data.get("cwd", os.path.expanduser("~"))
+    
+    if not command:
+        return jsonify({"error": "No command provided"}), 400
+    
+    # Execute with timeout
+    timeout = data.get("timeout", 30)
+    try:
+        timeout = max(1, min(300, int(timeout)))
+    except (ValueError, TypeError):
+        timeout = 30
+    
+    stdout, stderr, returncode = btr.execute_command(command, cwd=cwd, timeout=timeout)
+    
+    return jsonify({
+        "command": command,
+        "cwd": cwd,
+        "stdout": btr.escape_log_output(stdout),
+        "stderr": btr.escape_log_output(stderr),
+        "returncode": returncode,
+    })
+
+
+@app.route("/api/terminal/list-dir", methods=["POST"])
+def terminal_list_dir():
+    """List directory contents for file browser."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    path = data.get("path", os.path.expanduser("~"))
+    
+    success, files = btr.list_directory(path)
+    
+    if not success:
+        return jsonify({"error": f"Failed to list directory: {path}"}), 400
+    
+    return jsonify({
+        "path": path,
+        "files": files,
+    })
+
+
+@app.route("/api/terminal/read-file", methods=["POST"])
+def terminal_read_file():
+    """Read file contents."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    filepath = data.get("path", "")
+    
+    if not filepath:
+        return jsonify({"error": "No file path provided"}), 400
+    
+    success, content = btr.get_file_content(filepath)
+    
+    if not success:
+        return jsonify({"error": f"Failed to read file: {content}"}), 400
+    
+    return jsonify({
+        "path": filepath,
+        "content": content,
+    })
+
+
+@app.route("/api/terminal/write-file", methods=["POST"])
+def terminal_write_file():
+    """Write file contents."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    filepath = data.get("path", "")
+    content = data.get("content", "")
+    
+    if not filepath:
+        return jsonify({"error": "No file path provided"}), 400
+    
+    success, message = btr.save_file_content(filepath, content)
+    
+    if not success:
+        return jsonify({"error": message}), 400
+    
+    return jsonify({"message": message})
+
+
+@app.route("/api/terminal/scripts", methods=["GET"])
+def terminal_scripts_list():
+    """Get list of saved bash scripts."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    scripts = btr.get_script_list()
+    return jsonify({"scripts": scripts})
+
+
+@app.route("/api/terminal/scripts/create", methods=["POST"])
+def terminal_script_create():
+    """Create or update a bash script."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    filename = data.get("filename", "").strip()
+    content = data.get("content", "")
+    description = data.get("description", "")
+    cron_schedule = data.get("cron_schedule", "")
+    
+    if not filename:
+        return jsonify({"error": "No filename provided"}), 400
+    
+    success, message = btr.save_script(filename, content, description, cron_schedule)
+    
+    if not success:
+        return jsonify({"error": message}), 400
+    
+    return jsonify({"message": message})
+
+
+@app.route("/api/terminal/scripts/<filename>", methods=["GET"])
+def terminal_script_get(filename):
+    """Get content of a saved script."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    content = btr.get_script_content(filename)
+    
+    if content is None:
+        return jsonify({"error": "Script not found"}), 404
+    
+    return jsonify({
+        "filename": filename,
+        "content": content,
+    })
+
+
+@app.route("/api/terminal/delete-file", methods=["POST"])
+def terminal_delete_file():
+    """Delete a file."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    filepath = data.get("path", "")
+    
+    if not filepath:
+        return jsonify({"error": "No file path provided"}), 400
+    
+    success, message = btr.delete_file(filepath)
+    
+    if not success:
+        return jsonify({"error": message}), 400
+    
+    return jsonify({"message": message})
+
+
+@app.route("/api/terminal/delete-directory", methods=["POST"])
+def terminal_delete_directory():
+    """Delete a directory recursively."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    dirpath = data.get("path", "")
+    
+    if not dirpath:
+        return jsonify({"error": "No directory path provided"}), 400
+    
+    success, message = btr.delete_directory(dirpath)
+    
+    if not success:
+        return jsonify({"error": message}), 400
+    
+    return jsonify({"message": message})
+
+
+@app.route("/api/terminal/create-directory", methods=["POST"])
+def terminal_create_directory():
+    """Create a directory."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    data = request.get_json() or {}
+    dirpath = data.get("path", "")
+    
+    if not dirpath:
+        return jsonify({"error": "No directory path provided"}), 400
+    
+    success, message = btr.create_directory(dirpath)
+    
+    if not success:
+        return jsonify({"error": message}), 400
+    
+    return jsonify({"message": message})
+
+
+@app.route("/api/terminal/scripts/<filename>/delete", methods=["POST"])
+def terminal_script_delete(filename):
+    """Delete a saved script."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    success, message = btr.delete_script(filename)
+    
+    if not success:
+        return jsonify({"error": message}), 400
+    
+    return jsonify({"message": message})
+
+
+@app.route("/api/terminal/scripts/<filename>/execute", methods=["POST"])
+def terminal_script_execute(filename):
+    """Execute a saved bash script with optional arguments."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    content = btr.get_script_content(filename)
+    
+    if content is None:
+        return jsonify({"error": "Script not found"}), 404
+    
+    json_data = request.get_json() or {}
+    cwd = json_data.get("cwd", os.path.expanduser("~"))
+    arguments = json_data.get("arguments", "").strip()
+    
+    # Build command with arguments: 'bash -c "script" bash arg1 arg2 ...'
+    # The first bash is the shell, -c runs the script content, second 'bash' is $0,
+    # and remaining arguments become $1, $2, etc. accessible in the script
+    if arguments:
+        # Escape single quotes in content for safe shell execution
+        escaped_content = content.replace("'", "'\"'\"'")
+        cmd = f"bash -c '{escaped_content}' bash {arguments}"
+    else:
+        cmd = f"bash -c '{content}'"
+    
+    # Get timeout from request or use default; allow per-script override
+    timeout = json_data.get("timeout", BASH_TERMINAL_TIMEOUT)
+    timeout = max(10, min(timeout, 86400))
+    
+    stdout, stderr, returncode = btr.execute_command(cmd, cwd=cwd, timeout=timeout)
+    
+    return jsonify({
+        "filename": filename,
+        "stdout": btr.escape_log_output(stdout),
+        "stderr": btr.escape_log_output(stderr),
+        "returncode": returncode,
+    })
+
+
+@app.route("/api/terminal/pty/start", methods=["POST"])
+def terminal_pty_start():
+    """Start a PTY-backed shell session."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    data = request.get_json() or {}
+    cwd = data.get("cwd", os.path.expanduser("~"))
+    try:
+        session_id = btr.start_pty_session(cwd)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        app.logger.exception("Failed to start PTY session")
+        return jsonify({"error": "Failed to start terminal session"}), 500
+    return jsonify({"session_id": session_id})
+
+
+@app.route("/api/terminal/pty/read", methods=["GET"])
+def terminal_pty_read():
+    """Read available output from PTY."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    session_id = request.args.get("session_id", "")
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+    raw_output, running, exit_code = btr.read_pty_output(session_id)
+    output = btr.escape_log_output(raw_output)
+    return jsonify({
+        "output": output,
+        "running": running,
+        "exit_code": exit_code,
+        "session_open": btr.has_pty_session(session_id),
+    })
+
+
+@app.route("/api/terminal/pty/input", methods=["POST"])
+def terminal_pty_input():
+    """Write input to PTY."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    data = request.get_json() or {}
+    session_id = data.get("session_id", "")
+    text = data.get("data", "")
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+    ok = btr.write_pty_input(session_id, text)
+    if not ok:
+        return jsonify({"error": "session not found"}), 404
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/terminal/pty/signal", methods=["POST"])
+def terminal_pty_signal():
+    """Send signal (e.g., INT) to PTY process group."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    data = request.get_json() or {}
+    session_id = data.get("session_id", "")
+    sig_name = data.get("signal", "INT").upper()
+    sig_map = {
+        "INT": signal.SIGINT,
+        "TERM": signal.SIGTERM,
+        "KILL": signal.SIGKILL,
+    }
+    if sig_name not in sig_map:
+        return jsonify({"error": "Unsupported signal"}), 400
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+    ok = btr.signal_pty(session_id, sig_map[sig_name])
+    if not ok:
+        return jsonify({"error": "session not found"}), 404
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/terminal/pty/close", methods=["POST"])
+def terminal_pty_close():
+    """Explicitly close a PTY session and free resources."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    data = request.get_json() or {}
+    session_id = data.get("session_id", "")
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+    if not btr.has_pty_session(session_id):
+        return jsonify({"status": "already_closed"})
+    btr.cleanup_pty(session_id)
+    return jsonify({"status": "closed"})
+
+
+# =====================================================================
 # Original media route (serves from /downloads)
-# ---------------------------------------------------------------------
+# =====================================================================
 
 @app.route("/media/<path:subpath>")
 def media_file(subpath):
     ensure_data_dirs(ensure_downloads=True)
     return send_from_directory(DOWNLOADS_ROOT, subpath)
 
-# ---------------------------------------------------------------------
+@app.route("/api/terminal/scripts/<filename>/execute-async", methods=["POST"])
+def terminal_script_execute_async(filename):
+    """Execute a script asynchronously and return execution ID immediately."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    content = btr.get_script_content(filename)
+    
+    if content is None:
+        return jsonify({"error": "Script not found"}), 404
+    
+    json_data = request.get_json() or {}
+    cwd = json_data.get("cwd", os.path.expanduser("~"))
+    arguments = json_data.get("arguments", "").strip()
+    timeout = json_data.get("timeout", BASH_TERMINAL_TIMEOUT)
+    timeout = max(10, min(timeout, 86400))
+    
+    # Build command with arguments
+    if arguments:
+        escaped_content = content.replace("'", "'\"'\"'")
+        cmd = f"bash -c '{escaped_content}' bash {arguments}"
+    else:
+        cmd = f"bash -c '{content}'"
+    
+    # Start async execution and return ID immediately
+    exec_id = btr.start_async_script(cmd, cwd=cwd, timeout=timeout)
+    
+    return jsonify({
+        "exec_id": exec_id,
+        "filename": filename,
+        "status": "started",
+        "message": f"Script execution started in background. Use /api/terminal/exec/{exec_id} to monitor."
+    })
+
+
+@app.route("/api/terminal/exec/<exec_id>", methods=["GET"])
+def terminal_get_exec_status(exec_id):
+    """Get status of a background script execution."""
+    if not BASH_TERMINAL_ENABLED:
+        return jsonify({"error": "Bash terminal feature is disabled"}), 403
+    
+    status = btr.get_async_status(exec_id)
+    
+    if status is None:
+        return jsonify({"error": "Execution not found"}), 404
+    
+    return jsonify(status)
+
+
+# =====================================================================
 # Main (dev only)
-# ---------------------------------------------------------------------
+# =====================================================================
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

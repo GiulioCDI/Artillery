@@ -140,4 +140,62 @@
             </div>
         </div>    </div>
 </div>
+
+<!-- Bash terminal controls -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-body">
+                <h2 class="card-title mb-3">Bash Terminal (Advanced)</h2>
+
+                <p class="text-muted small mb-3">
+                    Enable the bash terminal for executing commands and managing files directly.
+                    <strong>Warning:</strong> This is an advanced feature that provides shell access.
+                </p>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <form method="post" action="{{ url_for('bash_terminal_toggle') }}" style="display: inline;">
+                        <button type="submit" class="btn {% if bash_terminal_enabled %}btn-success{% else %}btn-outline-success{% endif %}">
+                            {% if bash_terminal_enabled %}Bash Terminal enabled{% else %}Bash Terminal disabled{% endif %}
+                        </button>
+                    </form>
+                </div>
+
+                <div class="mt-3" style="max-width: 300px;">
+                    <label class="form-label" for="terminal_font_size">Terminal Font Size</label>
+                    <div class="input-group">
+                        <input type="range" class="form-range" id="terminal_font_size" min="8" max="20" value="{{ terminal_font_size | default(12) }}" />
+                        <span class="input-group-text" id="font_size_display" style="width: 50px; text-align: center;">{{ terminal_font_size | default(12) }}px</span>
+                    </div>
+                    <small class="form-text text-muted">Adjust terminal display font size (8-20px)</small>
+                </div>
+
+                <script>
+                    document.getElementById('terminal_font_size').addEventListener('input', (e) => {
+                        const fontSize = e.target.value;
+                        document.getElementById('font_size_display').textContent = fontSize + 'px';
+                        // Store in localStorage for immediate terminal update
+                        localStorage.setItem('terminal_font_size', fontSize);
+                        // Save to server
+                        fetch('/api/terminal/font-size', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ font_size: fontSize })
+                        }).catch(err => console.error('Failed to save font size:', err));
+                    });
+                </script>
+
+                <div class="form-text mt-3">
+                    <strong>Features when enabled:</strong>
+                    <ul>
+                        <li>Execute arbitrary bash commands with real-time output</li>
+                        <li>Browse and manage files in the filesystem</li>
+                        <li>Create, edit, and run bash scripts</li>
+                        <li>Schedule scripts to run via cron</li>
+                    </ul>
+                    <strong>Security note:</strong> Enable this feature only if you trust all users with access to Artillery.
+                </div>
+            </div>
+        </div>    </div>
+</div>
 {% endblock %}
