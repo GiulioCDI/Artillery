@@ -250,6 +250,17 @@
     let ptySessionId = null;
     let ptyPollTimer = null;
 
+    // HTML escape utility to prevent XSS
+    function escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     // Surface unexpected JS errors to the terminal so the user sees why things might be stuck
     window.addEventListener('error', (e) => {
         appendTerminalOutput(`Client error: ${e.message}`, 'text-error');
@@ -446,20 +457,39 @@
                 }
 
                 list.innerHTML = data.scripts.map(script => `
-                    <div class="script-item" onclick="selectScript('${script.filename}')">
-                        <div class="script-name">${script.name}</div>
-                        ${script.description ? `<div class="script-desc">${script.description}</div>` : ''}
+                    <div class="script-item" data-filename="${escapeHtml(script.filename)}">
+                        <div class="script-name">${escapeHtml(script.name)}</div>
+                        ${script.description ? `<div class="script-desc">${escapeHtml(script.description)}</div>` : ''}
                         <div style="margin-top: 8px; display: flex; gap: 5px;">
-                            <button class="btn btn-sm btn-info" onclick="executeScript('${script.filename}', event)">Run</button>
-                            <button class="btn btn-sm btn-primary" onclick="editScript('${script.filename}', event)">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteScript('${script.filename}', event)">Delete</button>
+                            <button class="btn btn-sm btn-info" data-action="run">Run</button>
+                            <button class="btn btn-sm btn-primary" data-action="edit">Edit</button>
+                            <button class="btn btn-sm btn-danger" data-action="delete">Delete</button>
                         </div>
                     </div>
                 `).join('');
+
+                // Add event delegation for script buttons
+                document.querySelectorAll('.script-item').forEach(item => {
+                    const filename = item.dataset.filename;
+                    item.addEventListener('click', (e) => {
+                        if (!e.target.closest('button')) {
+                            selectScript(filename);
+                        }
+                    });
+                    item.querySelectorAll('button').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const action = btn.dataset.action;
+                            if (action === 'run') executeScript(filename, e);
+                            else if (action === 'edit') editScript(filename, e);
+                            else if (action === 'delete') deleteScript(filename, e);
+                        });
+                    });
+                });
             })
             .catch(err => {
                 const list = document.getElementById('scripts_list');
-                list.innerHTML = `<div class="text-danger text-center py-3">Failed to load scripts: ${err.message}</div>`;
+                list.innerHTML = `<div class="text-danger text-center py-3">Failed to load scripts: ${escapeHtml(err.message)}</div>`;
                 appendTerminalOutput(`Failed to load scripts: ${err.message}`, 'text-error');
             });
     }
@@ -731,7 +761,7 @@
             const tbody = document.getElementById('file_browser_list');
             console.log('File browser response:', data);
             if (data.error) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${data.error}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${escapeHtml(data.error)}</td></tr>`;
                 appendTerminalOutput(`File browser error: ${data.error}`, 'text-error');
                 return;
             }
@@ -743,15 +773,15 @@
 
             tbody.innerHTML = data.files.map(file => `
                 <tr>
-                    <td>${file.name}</td>
+                    <td>${escapeHtml(file.name)}</td>
                     <td>${file.is_dir ? '📁 Dir' : '📄 File'}</td>
                     <td>${file.size ? (file.size / 1024).toFixed(1) + ' KB' : '-'}</td>
                     <td><small>${new Date(file.modified).toLocaleString()}</small></td>
                     <td>
                         ${file.is_dir ? 
-                            `<button class="btn btn-sm btn-info" data-action="open-dir" data-path="${file.path.replace(/"/g, '&quot;')}">Open</button>` :
-                            `<button class="btn btn-sm btn-primary" data-action="view-file" data-path="${file.path.replace(/"/g, '&quot;')}">View</button>
-                             <button class="btn btn-sm btn-danger" data-action="delete-file" data-path="${file.path.replace(/"/g, '&quot;')}">Del</button>`
+                            `<button class="btn btn-sm btn-info" data-action="open-dir" data-path="${escapeHtml(file.path)}">Open</button>` :
+                            `<button class="btn btn-sm btn-primary" data-action="view-file" data-path="${escapeHtml(file.path)}">View</button>
+                             <button class="btn btn-sm btn-danger" data-action="delete-file" data-path="${escapeHtml(file.path)}">Del</button>`
                         }
                     </td>
                 </tr>
@@ -759,7 +789,7 @@
         })
         .catch(err => {
             document.getElementById('file_browser_list').innerHTML = 
-                `<tr><td colspan="5" class="text-danger">Failed to load directory: ${err.message}</td></tr>`;
+                `<tr><td colspan="5" class="text-danger">Failed to load directory: ${escapeHtml(err.message)}</td></tr>`;
             appendTerminalOutput(`Failed to load directory: ${err.message}`, 'text-error');
         });
     }
