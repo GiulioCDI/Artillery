@@ -330,8 +330,12 @@ def list_directory(path: str = "/") -> Tuple[bool, List[Dict]]:
         
         # Security: prevent access to sensitive directories
         for blocked in BLOCKED_DIRECTORIES:
-            if dir_path == blocked or (str(dir_path).startswith(str(blocked) + "/")):
-                return False, []
+            try:
+                if dir_path == blocked or _is_relative_to(dir_path, blocked):
+                    return False, []
+            except ValueError:
+                # On Windows, paths on different drives may raise ValueError; treat as not blocked
+                continue
         
         if not dir_path.is_dir():
             return False, []
