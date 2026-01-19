@@ -13,9 +13,10 @@ PGID="${PGID:-0}"
 : "${TASKS_DIR:=/tasks}"
 : "${CONFIG_DIR:=/config}"
 : "${DOWNLOADS_DIR:=/downloads}"
+: "${BASH_TERMINAL_SCRIPT_DIR:=/scripts}"
 
 # Validate directories are accessible
-for dir in "$TASKS_DIR" "$CONFIG_DIR" "$DOWNLOADS_DIR"; do
+for dir in "$TASKS_DIR" "$CONFIG_DIR" "$DOWNLOADS_DIR" "$BASH_TERMINAL_SCRIPT_DIR"; do
   mkdir -p "$dir" || { log "ERROR: Failed to create directory: $dir"; exit 1; }
   if [ ! -w "$dir" ]; then
     log "ERROR: Directory is not writable: $dir"
@@ -27,6 +28,7 @@ log "Configuration validated:"
 log "  TASKS_DIR: $TASKS_DIR"
 log "  CONFIG_DIR: $CONFIG_DIR"
 log "  DOWNLOADS_DIR: $DOWNLOADS_DIR"
+log "  BASH_TERMINAL_SCRIPT_DIR: $BASH_TERMINAL_SCRIPT_DIR"
 
 log "Updating gallery-dl to latest..."
 pip install --no-cache-dir --upgrade gallery-dl
@@ -43,7 +45,7 @@ if [ "$PUID" != "0" ] && [ "$PGID" != "0" ]; then
   log "Using PUID=$PUID PGID=$PGID for ownership and processes"
 
   # Own the mapped directories (best effort)
-  chown -R "$PUID:$PGID" "$TASKS_DIR" "$CONFIG_DIR" "$DOWNLOADS_DIR" 2>/dev/null || true
+  chown -R "$PUID:$PGID" "$TASKS_DIR" "$CONFIG_DIR" "$DOWNLOADS_DIR" "$BASH_TERMINAL_SCRIPT_DIR" 2>/dev/null || true
 else
   APP_USER_SPEC="root"
   log "PUID/PGID not set (or zero), running as root."

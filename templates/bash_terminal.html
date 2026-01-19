@@ -1,0 +1,950 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-body">
+                <h2 class="card-title mb-3">Bash Terminal</h2>
+                <p class="text-muted small">Execute commands, manage files, and create bash scripts.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Terminal Output -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Terminal</h5>
+                
+                <div class="mb-3">
+                    <label class="form-label" for="terminal_cwd">Working Directory</label>
+                    <input type="text" id="terminal_cwd" class="form-control" value="/root" />
+                </div>
+
+                <div class="terminal-output bg-dark border rounded p-3 mb-3" id="terminal_output" 
+                     style="height: 400px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: var(--terminal-font-size, 12px); display: flex; flex-direction: column;">
+                    <div style="white-space: nowrap;"><span class="text-success">$</span> <span class="text-muted">Ready</span></div>
+                    <div class="terminal-prompt-line" style="display:flex; gap:6px; align-items:center; margin-top:4px;">
+                        <span class="text-success">$</span>
+                        <span id="terminal_prompt" class="terminal-prompt" contenteditable="true" spellcheck="false" aria-label="Terminal input" style="outline:none; min-width:20px; flex:1; white-space:pre;"></span>
+                    </div>
+                </div>
+
+                <div class="input-group mb-3 d-none">
+                    <input type="text" id="terminal_command" class="form-control" placeholder="Enter command..." />
+                    <button class="btn btn-primary" id="terminal_run" type="button">Run</button>
+                    <button class="btn btn-outline-secondary" id="terminal_clear" type="button">Clear</button>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="terminal_auto_scroll" checked />
+                    <label class="form-check-label" for="terminal_auto_scroll">
+                        Auto-scroll output
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saved Scripts Panel -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Saved Scripts</h5>
+                
+                <div class="mb-3">
+                    <label class="form-label" for="script_args">Arguments</label>
+                    <input type="text" id="script_args" class="form-control form-control-sm" placeholder="e.g., --commands arg1 arg2" />
+                    <small class="text-muted">Pass arguments to script: accessible as $1, $2, etc.</small>
+                </div>
+                
+                <div id="scripts_list" style="max-height: 500px; overflow-y: auto;">
+                    <div class="text-muted text-center py-3">Loading scripts...</div>
+                </div>
+
+                <hr />
+
+                <button class="btn btn-success btn-sm w-100" id="new_script_btn" data-bs-toggle="modal" 
+                        data-bs-target="#script_editor_modal">
+                    <i class="bi bi-plus"></i> New Script
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Browser -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3">File Browser</h5>
+                
+                <div class="mb-3">
+                    <label class="form-label" for="file_browser_path">Path</label>
+                    <div class="input-group">
+                        <input type="text" id="file_browser_path" class="form-control" value="/root" />
+                        <button class="btn btn-outline-secondary" id="file_browser_go" type="button">Go</button>
+                        <button class="btn btn-outline-secondary" id="file_browser_parent" type="button">Parent</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Modified</th>
+                                <th style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="file_browser_list">
+                            <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Script Editor Modal -->
+<div class="modal fade" id="script_editor_modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Script Editor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label" for="script_filename">Filename</label>
+                    <input type="text" id="script_filename" class="form-control" placeholder="script.sh" />
+                    <small class="form-text text-muted">Must end with .sh</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="script_description">Description</label>
+                    <input type="text" id="script_description" class="form-control" placeholder="What does this script do?" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="script_cron">Cron Schedule (optional)</label>
+                    <input type="text" id="script_cron" class="form-control" placeholder="0 2 * * * (for 2am daily)" />
+                    <small class="form-text text-muted">Crontab format: minute hour day month weekday</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="script_content">Script Content</label>
+                    <textarea id="script_content" class="form-control" rows="12" placeholder="#!/bin/bash&#10;# Your script here"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="script_save_btn">Save Script</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Editor Modal -->
+<div class="modal fade" id="file_editor_modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="file_editor_title">Edit File</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">File Path</label>
+                    <input type="text" id="file_editor_path" class="form-control" readonly />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="file_editor_content">Content</label>
+                    <textarea id="file_editor_content" class="form-control" rows="12"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="file_editor_save_btn">Save File</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .terminal-output {
+        color: #0f0;
+        background-color: #0a0a0a;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+    }
+
+    .terminal-prompt {
+        color: #fff;
+        border: none;
+        caret-color: #51cf66;
+    }
+
+    .terminal-prompt:empty::before {
+        content: 'type a command and press Enter';
+        color: #666;
+    }
+
+    .terminal-output .text-error {
+        color: #ff6b6b;
+    }
+
+    .terminal-output .text-success {
+        color: #51cf66;
+    }
+
+    .terminal-output .text-warning {
+        color: #ffd43b;
+    }
+
+    .script-item {
+        padding: 10px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .script-item:hover {
+        background-color: #1a1a1a;
+        border-color: #666;
+    }
+
+    .script-item.active {
+        background-color: #0d47a1;
+        border-color: #1976d2;
+    }
+
+    .script-name {
+        font-weight: bold;
+        color: #fff;
+    }
+
+    .script-desc {
+        font-size: 12px;
+        color: #aaa;
+        margin-top: 2px;
+    }
+</style>
+
+<script>
+    // Global state
+    let currentWorkdir = '/root';
+    let currentScript = null;
+    let scriptEditorModal = null;
+    let fileEditorModal = null;
+    let ptySessionId = null;
+    let ptyPollTimer = null;
+
+    // Surface unexpected JS errors to the terminal so the user sees why things might be stuck
+    window.addEventListener('error', (e) => {
+        appendTerminalOutput(`Client error: ${e.message}`, 'text-error');
+    });
+
+    window.addEventListener('unhandledrejection', (e) => {
+        appendTerminalOutput(`Client promise rejection: ${e.reason}`, 'text-error');
+    });
+
+    // =====================================================================
+    // Terminal Functions
+    // =====================================================================
+
+    function appendTerminalOutput(text, className = '', asHtml = false) {
+        const output = document.getElementById('terminal_output');
+        const line = document.createElement('div');
+        if (className) {
+            line.className = className;
+        }
+        if (asHtml) {
+            line.innerHTML = text;
+        } else {
+            line.textContent = text;
+        }
+        const promptLine = document.querySelector('.terminal-prompt-line');
+        if (promptLine) {
+            output.insertBefore(line, promptLine);
+        } else {
+            output.appendChild(line);
+        }
+        
+        if (document.getElementById('terminal_auto_scroll').checked) {
+            output.scrollTop = output.scrollHeight;
+        }
+    }
+
+    function clearTerminal() {
+        const output = document.getElementById('terminal_output');
+        const promptLine = output.querySelector('.terminal-prompt-line');
+        // Remove all nodes except the prompt line
+        const nodes = Array.from(output.childNodes);
+        nodes.forEach(node => {
+            if (node !== promptLine) output.removeChild(node);
+        });
+        appendTerminalOutput('Terminal cleared', 'text-muted');
+    }
+
+    function executeCommand() {
+        const command = document.getElementById('terminal_command').value.trim();
+        if (!command) return;
+        document.getElementById('terminal_command').value = '';
+        sendPtyInput(command + '\n');
+    }
+
+    function executePromptCommand() {
+        const promptEl = document.getElementById('terminal_prompt');
+        const command = promptEl.textContent.trim();
+        promptEl.textContent = '';
+        if (!command) return;
+        sendPtyInput(command + '\n');
+    }
+
+    async function ensurePtySession() {
+        if (ptySessionId) return;
+        try {
+            const r = await fetch('/api/terminal/pty/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cwd: document.getElementById('terminal_cwd').value })
+            });
+            const text = await r.text();
+            if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+            const data = JSON.parse(text);
+            ptySessionId = data.session_id;
+            startPtyPolling();
+        } catch (e) {
+            appendTerminalOutput(`Failed to start terminal session: ${e.message}`, 'text-error');
+        }
+    }
+
+    function startPtyPolling() {
+        if (ptyPollTimer) return;
+        ptyPollTimer = setInterval(pollPty, 400);
+    }
+
+    async function pollPty() {
+        if (!ptySessionId) return;
+        try {
+            const r = await fetch(`/api/terminal/pty/read?session_id=${encodeURIComponent(ptySessionId)}`);
+            const text = await r.text();
+            if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+            const data = JSON.parse(text);
+            if (data.output) appendTerminalOutput(data.output, '', false);
+            if (!data.running) {
+                const endMsg = (data.exit_code === 0 || data.exit_code === null)
+                    ? '[session ended]'
+                    : `[session ended with code ${data.exit_code}]`;
+                appendTerminalOutput(endMsg, 'text-muted');
+                const closedId = ptySessionId;
+                clearInterval(ptyPollTimer);
+                ptyPollTimer = null;
+                ptySessionId = null;
+                closePtySession(closedId);
+            }
+        } catch (e) {
+            appendTerminalOutput(`PTY read error: ${e.message}`, 'text-error');
+            const closedId = ptySessionId;
+            clearInterval(ptyPollTimer);
+            ptyPollTimer = null;
+            ptySessionId = null;
+            closePtySession(closedId);
+        }
+    }
+
+    async function sendPtyInput(data) {
+        await ensurePtySession();
+        if (!ptySessionId) return;
+        try {
+            const r = await fetch('/api/terminal/pty/input', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: ptySessionId, data })
+            });
+            if (!r.ok) {
+                const text = await r.text();
+                throw new Error(text || `HTTP ${r.status}`);
+            }
+        } catch (e) {
+            appendTerminalOutput(`Input failed: ${e.message}`, 'text-error');
+        }
+    }
+
+    async function closePtySession(sessionId) {
+        if (!sessionId) return;
+        try {
+            await fetch('/api/terminal/pty/close', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+        } catch (e) {
+            console.warn('PTY close failed:', e);
+        }
+    }
+
+    async function sendCtrlC() {
+        if (!ptySessionId) return;
+        try {
+            await fetch('/api/terminal/pty/signal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: ptySessionId, signal: 'INT' })
+            });
+            appendTerminalOutput('^C', 'text-warning');
+        } catch (e) {
+            appendTerminalOutput(`Signal failed: ${e.message}`, 'text-error');
+        }
+    }
+
+    function focusPrompt() {
+        const prompt = document.getElementById('terminal_prompt');
+        if (!prompt) return;
+        prompt.focus();
+        const range = document.createRange();
+        range.selectNodeContents(prompt);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    // =====================================================================
+    // Script Management
+    // =====================================================================
+
+    function loadScripts() {
+        fetch('/api/terminal/scripts')
+            .then(async r => {
+                const text = await r.text();
+                if (!r.ok) {
+                    throw new Error(text || `HTTP ${r.status}`);
+                }
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+                }
+            })
+            .then(data => {
+                const list = document.getElementById('scripts_list');
+                if (!data.scripts || data.scripts.length === 0) {
+                    list.innerHTML = '<div class="text-muted text-center py-3">No scripts yet</div>';
+                    return;
+                }
+
+                list.innerHTML = data.scripts.map(script => `
+                    <div class="script-item" onclick="selectScript('${script.filename}')">
+                        <div class="script-name">${script.name}</div>
+                        ${script.description ? `<div class="script-desc">${script.description}</div>` : ''}
+                        <div style="margin-top: 8px; display: flex; gap: 5px;">
+                            <button class="btn btn-sm btn-info" onclick="executeScript('${script.filename}', event)">Run</button>
+                            <button class="btn btn-sm btn-primary" onclick="editScript('${script.filename}', event)">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteScript('${script.filename}', event)">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(err => {
+                const list = document.getElementById('scripts_list');
+                list.innerHTML = `<div class="text-danger text-center py-3">Failed to load scripts: ${err.message}</div>`;
+                appendTerminalOutput(`Failed to load scripts: ${err.message}`, 'text-error');
+            });
+    }
+
+    function selectScript(filename) {
+        currentScript = filename;
+    }
+
+    function editScript(filename, e) {
+        e.stopPropagation();
+        if (!scriptEditorModal) {
+            appendTerminalOutput('Script editor unavailable (bootstrap missing)', 'text-error');
+            return;
+        }
+        fetch(`/api/terminal/scripts/${filename}`)
+            .then(async r => {
+                const text = await r.text();
+                if (!r.ok) {
+                    throw new Error(text || `HTTP ${r.status}`);
+                }
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+                }
+            })
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                document.getElementById('script_filename').value = filename;
+                document.getElementById('script_content').value = data.content;
+                document.getElementById('script_description').value = '';
+                document.getElementById('script_cron').value = '';
+                scriptEditorModal.show();
+            })
+            .catch(err => appendTerminalOutput(`Load script failed: ${err.message}`, 'text-error'));
+    }
+
+    // Track active executions so polling resumes after tab switches/reloads
+    let activeExecs = {};
+
+    function executeScript(filename, e) {
+        e.stopPropagation();
+        const args = document.getElementById('script_args').value.trim();
+        const displayCmd = args ? `${filename} ${args}` : filename;
+        appendTerminalOutput(`<span class="text-success">$</span> Executing script: ${displayCmd} (async)`);
+        
+        // Use async execution to avoid blocking gunicorn workers
+        fetch(`/api/terminal/scripts/${filename}/execute-async`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cwd: document.getElementById('terminal_cwd').value, arguments: args })
+        })
+        .then(async r => {
+            const text = await r.text();
+            if (!r.ok) {
+                throw new Error(text || `HTTP ${r.status}`);
+            }
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+            }
+        })
+        .then(data => {
+            if (data.error) {
+                appendTerminalOutput(`Error: ${data.error}`, 'text-error');
+                return;
+            }
+            
+            const execId = data.exec_id;
+            appendTerminalOutput(`Execution ID: ${execId}`, 'text-info');
+            appendTerminalOutput(`Polling for status... (updates every 2s)`, 'text-muted');
+            trackActiveExec(execId, filename);
+            
+            // Poll for status every 2 seconds
+            pollAsyncStatus(execId);
+        })
+        .catch(err => appendTerminalOutput(`Failed to start script: ${err.message}`, 'text-error'));
+    }
+
+    function trackActiveExec(execId, filename) {
+        activeExecs[execId] = { filename, startedAt: Date.now() };
+        try {
+            localStorage.setItem('terminal_active_execs', JSON.stringify(activeExecs));
+        } catch (e) {
+            console.warn('Failed to persist active execs:', e);
+        }
+    }
+
+    function untrackActiveExec(execId) {
+        if (activeExecs[execId]) {
+            delete activeExecs[execId];
+            try {
+                localStorage.setItem('terminal_active_execs', JSON.stringify(activeExecs));
+            } catch (e) {
+                console.warn('Failed to persist active execs:', e);
+            }
+        }
+    }
+
+    function restoreActiveExecs() {
+        try {
+            const saved = localStorage.getItem('terminal_active_execs');
+            if (saved) {
+                activeExecs = JSON.parse(saved) || {};
+            }
+        } catch (e) {
+            console.warn('Failed to restore active execs:', e);
+            activeExecs = {};
+        }
+    }
+
+    function pollAsyncStatus(execId, attempt = 0) {
+        fetch(`/api/terminal/exec/${execId}`)
+            .then(async r => {
+                const text = await r.text();
+                if (!r.ok) {
+                    throw new Error(text || `HTTP ${r.status}`);
+                }
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Bad JSON response: ${e.message}`);
+                }
+            })
+            .then(data => {
+                const status = data.status;
+                const elapsed = data.elapsed_seconds;
+                
+                // Show current status
+                if (status === 'running') {
+                    appendTerminalOutput(`[${elapsed}s] Still running...`, 'text-muted');
+                    // Keep polling
+                    setTimeout(() => pollAsyncStatus(execId, attempt + 1), 2000);
+                } else if (status === 'completed') {
+                    appendTerminalOutput(`[${elapsed}s] Completed successfully!`, 'text-success');
+                    if (data.stdout) appendTerminalOutput(data.stdout);
+                    if (data.stderr && data.stderr.trim()) appendTerminalOutput(data.stderr, 'text-warning');
+                    untrackActiveExec(execId);
+                } else if (status === 'failed') {
+                    appendTerminalOutput(`[${elapsed}s] Script failed`, 'text-error');
+                    if (data.error) appendTerminalOutput(data.error, 'text-error');
+                    if (data.stdout) appendTerminalOutput(data.stdout);
+                    if (data.stderr) appendTerminalOutput(data.stderr, 'text-warning');
+                    untrackActiveExec(execId);
+                } else if (status === 'timeout') {
+                    appendTerminalOutput(`[${elapsed}s] Script timed out`, 'text-error');
+                    if (data.error) appendTerminalOutput(data.error, 'text-error');
+                    untrackActiveExec(execId);
+                }
+            })
+            .catch(err => {
+                appendTerminalOutput(`Status check failed: ${err.message}`, 'text-error');
+                // Stop polling on error
+            });
+    }
+
+    function deleteScript(filename, e) {
+        e.stopPropagation();
+        if (!confirm(`Delete script: ${filename}?`)) return;
+        
+        fetch(`/api/terminal/scripts/${filename}/delete`, { method: 'POST' })
+            .then(async r => {
+                const text = await r.text();
+                if (!r.ok) {
+                    throw new Error(text || `HTTP ${r.status}`);
+                }
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+                }
+            })
+            .then(data => {
+                if (data.error) {
+                    appendTerminalOutput(data.error, 'text-error');
+                } else {
+                    appendTerminalOutput(data.message, 'text-success');
+                    loadScripts();
+                }
+            })
+            .catch(err => appendTerminalOutput(`Delete script failed: ${err.message}`, 'text-error'));
+    }
+
+    function saveScript() {
+        const filename = document.getElementById('script_filename').value.trim();
+        const content = document.getElementById('script_content').value;
+        const description = document.getElementById('script_description').value;
+        const cron = document.getElementById('script_cron').value;
+
+        if (!filename) {
+            alert('Please enter a filename');
+            return;
+        }
+
+        if (!content) {
+            alert('Please enter script content');
+            return;
+        }
+
+        if (!scriptEditorModal) {
+            appendTerminalOutput('Script editor unavailable (bootstrap missing)', 'text-error');
+            return;
+        }
+
+        fetch('/api/terminal/scripts/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filename: filename,
+                content: content,
+                description: description,
+                cron_schedule: cron
+            })
+        })
+        .then(async r => {
+            if (!r.ok) {
+                const text = await r.text();
+                throw new Error(text || `HTTP ${r.status}`);
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                if (scriptEditorModal) scriptEditorModal.hide();
+                appendTerminalOutput(data.message, 'text-success');
+                loadScripts();
+                document.getElementById('script_filename').value = '';
+                document.getElementById('script_content').value = '';
+                document.getElementById('script_description').value = '';
+                document.getElementById('script_cron').value = '';
+            }
+        });
+    }
+
+    // =====================================================================
+    // File Browser
+    // =====================================================================
+
+    function loadFileBrowser(path = null) {
+        if (path) {
+            document.getElementById('file_browser_path').value = path;
+        }
+        const currentPath = document.getElementById('file_browser_path').value;
+        console.log('Loading file browser for path:', currentPath);
+
+        fetch('/api/terminal/list-dir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: currentPath })
+        })
+        .then(async r => {
+            const text = await r.text();
+            if (!r.ok) {
+                throw new Error(text || `HTTP ${r.status}`);
+            }
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+            }
+        })
+        .then(data => {
+            const tbody = document.getElementById('file_browser_list');
+            console.log('File browser response:', data);
+            if (data.error) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-danger">${data.error}</td></tr>`;
+                appendTerminalOutput(`File browser error: ${data.error}`, 'text-error');
+                return;
+            }
+
+            if (!data.files || data.files.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-muted text-center">No files or folders</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.files.map(file => `
+                <tr>
+                    <td>${file.name}</td>
+                    <td>${file.is_dir ? '📁 Dir' : '📄 File'}</td>
+                    <td>${file.size ? (file.size / 1024).toFixed(1) + ' KB' : '-'}</td>
+                    <td><small>${new Date(file.modified).toLocaleString()}</small></td>
+                    <td>
+                        ${file.is_dir ? 
+                            `<button class="btn btn-sm btn-info" data-action="open-dir" data-path="${file.path.replace(/"/g, '&quot;')}">Open</button>` :
+                            `<button class="btn btn-sm btn-primary" data-action="view-file" data-path="${file.path.replace(/"/g, '&quot;')}">View</button>
+                             <button class="btn btn-sm btn-danger" data-action="delete-file" data-path="${file.path.replace(/"/g, '&quot;')}">Del</button>`
+                        }
+                    </td>
+                </tr>
+            `).join('');
+        })
+        .catch(err => {
+            document.getElementById('file_browser_list').innerHTML = 
+                `<tr><td colspan="5" class="text-danger">Failed to load directory: ${err.message}</td></tr>`;
+            appendTerminalOutput(`Failed to load directory: ${err.message}`, 'text-error');
+        });
+    }
+
+    function viewFile(filepath) {
+        if (!fileEditorModal) {
+            appendTerminalOutput('File editor unavailable (bootstrap missing)', 'text-error');
+            return;
+        }
+
+        fetch('/api/terminal/read-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filepath })
+        })
+        .then(async r => {
+            const text = await r.text();
+            if (!r.ok) {
+                throw new Error(text || `HTTP ${r.status}`);
+            }
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+            }
+        })
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            document.getElementById('file_editor_path').value = filepath;
+            document.getElementById('file_editor_content').value = data.content;
+            document.getElementById('file_editor_title').textContent = `Edit: ${filepath}`;
+            if (fileEditorModal) fileEditorModal.show();
+        })
+        .catch(err => appendTerminalOutput(`Read file failed: ${err.message}`, 'text-error'));
+    }
+
+    function saveFile() {
+        const filepath = document.getElementById('file_editor_path').value;
+        const content = document.getElementById('file_editor_content').value;
+
+        fetch('/api/terminal/write-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filepath, content: content })
+        })
+        .then(async r => {
+            const text = await r.text();
+            if (!r.ok) {
+                throw new Error(text || `HTTP ${r.status}`);
+            }
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+            }
+        })
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                if (fileEditorModal) fileEditorModal.hide();
+                appendTerminalOutput(data.message, 'text-success');
+            }
+        })
+        .catch(err => appendTerminalOutput(`Save failed: ${err.message}`, 'text-error'));
+    }
+
+    function deleteFile(filepath) {
+        if (!confirm(`Delete file: ${filepath}?`)) return;
+        
+        fetch('/api/terminal/delete-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filepath })
+        })
+        .then(async r => {
+            const text = await r.text();
+            if (!r.ok) {
+                throw new Error(text || `HTTP ${r.status}`);
+            }
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error(`Bad JSON response: ${e.message}. Body: ${text.substring(0,200)}`);
+            }
+        })
+        .then(data => {
+            if (data.error) {
+                appendTerminalOutput(data.error, 'text-error');
+            } else {
+                appendTerminalOutput(data.message, 'text-success');
+                loadFileBrowser();
+            }
+        })
+        .catch(err => appendTerminalOutput(`Delete failed: ${err.message}`, 'text-error'));
+    }
+
+    // =====================================================================
+    // Event Listeners
+    // =====================================================================
+
+    document.getElementById('terminal_command').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeCommand();
+    });
+
+    document.getElementById('terminal_prompt').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            executePromptCommand();
+        } else if (e.key === 'c' && e.ctrlKey) {
+            e.preventDefault();
+            sendCtrlC();
+        }
+    });
+
+    document.getElementById('terminal_output').addEventListener('click', () => focusPrompt());
+
+    document.getElementById('terminal_run').addEventListener('click', executeCommand);
+    document.getElementById('terminal_clear').addEventListener('click', clearTerminal);
+    document.getElementById('terminal_cwd').addEventListener('change', (e) => {
+        currentWorkdir = e.target.value;
+    });
+
+    document.getElementById('file_browser_go').addEventListener('click', () => loadFileBrowser());
+    document.getElementById('file_browser_parent').addEventListener('click', () => {
+        const current = document.getElementById('file_browser_path').value;
+        const parent = current.split('/').slice(0, -1).join('/') || '/';
+        loadFileBrowser(parent);
+    });
+
+    // File browser table event delegation
+    document.getElementById('file_browser_list').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        
+        const action = btn.getAttribute('data-action');
+        const path = btn.getAttribute('data-path');
+        
+        if (action === 'open-dir') loadFileBrowser(path);
+        else if (action === 'view-file') viewFile(path);
+        else if (action === 'delete-file') deleteFile(path);
+    });
+
+    document.getElementById('script_save_btn').addEventListener('click', saveScript);
+    document.getElementById('file_editor_save_btn').addEventListener('click', saveFile);
+
+    // =====================================================================
+    // Initialization
+    // =====================================================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+        restoreActiveExecs();
+        focusPrompt();
+        // Set initial placeholders so UI doesn't stay stuck on generic loading text
+        document.getElementById('scripts_list').innerHTML = '<div class="text-muted text-center py-3">Loading scripts...</div>';
+        document.getElementById('file_browser_list').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Loading directory...</td></tr>';
+
+        // Apply terminal font size from localStorage or default
+        const terminalFontSize = localStorage.getItem('terminal_font_size') || '12';
+        document.documentElement.style.setProperty('--terminal-font-size', terminalFontSize + 'px');
+
+        // Initialize modals only if bootstrap is available
+        if (window.bootstrap && bootstrap.Modal) {
+            scriptEditorModal = new bootstrap.Modal(document.getElementById('script_editor_modal'));
+            fileEditorModal = new bootstrap.Modal(document.getElementById('file_editor_modal'));
+        } else {
+            appendTerminalOutput('Bootstrap JS not loaded; modal features disabled.', 'text-error');
+        }
+
+        // Resume polling any in-flight executions after tab switch/reload
+        const execIds = Object.keys(activeExecs || {});
+        if (execIds.length) {
+            appendTerminalOutput(`Resuming ${execIds.length} running script(s)...`, 'text-info');
+            execIds.forEach(id => pollAsyncStatus(id));
+        }
+
+        loadScripts();
+        loadFileBrowser();
+
+        // Start PTY session immediately for interactive terminal
+        ensurePtySession();
+    });
+</script>
+
+{% endblock %}

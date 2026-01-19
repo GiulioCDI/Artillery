@@ -48,6 +48,14 @@
                             Tasks
                         </a>
                     </li>
+                    {% if bash_terminal_enabled %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'terminal_page' %}active{% endif %}"
+                            href="{{ url_for('terminal_page') }}">
+                            Terminal
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'config_page' %}active{% endif %}"
                             href="{{ url_for('config_page') }}">

@@ -176,6 +176,11 @@ class Config:
     media_wall_auto_refresh_on_task_end: bool
     media_wall_min_refresh_seconds: int
     
+    # Bash terminal
+    bash_terminal_enabled: bool
+    bash_terminal_script_dir: Path
+    bash_terminal_timeout: int
+    
     # Gallery-dl config
     default_config_url: str
     
@@ -197,10 +202,12 @@ class Config:
         tasks_dir = _validate_directory("TASKS_DIR", "/tasks")
         config_dir = _validate_directory("CONFIG_DIR", "/config")
         downloads_dir = _validate_directory("DOWNLOADS_DIR", "/downloads")
+        bash_terminal_script_dir = _validate_directory("BASH_TERMINAL_SCRIPT_DIR", "/scripts")
         
         logger.info(f"  TASKS_DIR: {tasks_dir}")
         logger.info(f"  CONFIG_DIR: {config_dir}")
         logger.info(f"  DOWNLOADS_DIR: {downloads_dir}")
+        logger.info(f"  BASH_TERMINAL_SCRIPT_DIR: {bash_terminal_script_dir}")
         
         # Logging configuration
         log_level = os.environ.get("ARTILLERY_LOG_LEVEL", "INFO").upper()
@@ -248,6 +255,9 @@ class Config:
                 "MEDIA_WALL_AUTO_REFRESH_ON_TASK_END", True
             ),
             media_wall_min_refresh_seconds=media_wall_min_refresh,
+            bash_terminal_enabled=_validate_bool("BASH_TERMINAL_ENABLED", False),
+            bash_terminal_script_dir=bash_terminal_script_dir,
+            bash_terminal_timeout=_validate_int("BASH_TERMINAL_TIMEOUT", 3600, min_val=10, max_val=86400),
             default_config_url=os.environ.get(
                 "GALLERYDL_DEFAULT_CONFIG_URL",
                 "https://raw.githubusercontent.com/mikf/gallery-dl/master/docs/gallery-dl.conf",
