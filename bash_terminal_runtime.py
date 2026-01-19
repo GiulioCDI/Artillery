@@ -521,8 +521,9 @@ class PtySession:
                     if not data:
                         break
                     self.buffer.append(data.decode(errors="replace"))
-            except OSError:
-                pass
+            except OSError as exc:
+                # PTY may be closed or unavailable; ignore read errors but log for debugging.
+                logger.debug("PTYSession %s: OSError while reading from PTY: %s", self.session_id, exc)
 
     def read_output(self) -> Tuple[str, bool, Optional[int]]:
         """Return buffered output, running status, and exit code if finished."""
