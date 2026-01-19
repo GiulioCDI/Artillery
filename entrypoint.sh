@@ -15,14 +15,21 @@ PGID="${PGID:-0}"
 : "${DOWNLOADS_DIR:=/downloads}"
 : "${BASH_TERMINAL_SCRIPT_DIR:=/scripts}"
 
-# Validate directories are accessible
-for dir in "$TASKS_DIR" "$CONFIG_DIR" "$DOWNLOADS_DIR" "$BASH_TERMINAL_SCRIPT_DIR"; do
+# Validate critical directories are accessible
+for dir in "$TASKS_DIR" "$CONFIG_DIR" "$DOWNLOADS_DIR"; do
   mkdir -p "$dir" || { log "ERROR: Failed to create directory: $dir"; exit 1; }
   if [ ! -w "$dir" ]; then
     log "ERROR: Directory is not writable: $dir"
     exit 1
   fi
 done
+
+# Validate scripts directory (non-fatal - bash terminal feature will handle lazily if needed)
+if mkdir -p "$BASH_TERMINAL_SCRIPT_DIR" 2>/dev/null && [ -w "$BASH_TERMINAL_SCRIPT_DIR" ]; then
+  log "Scripts directory validated: $BASH_TERMINAL_SCRIPT_DIR"
+else
+  log "WARNING: Scripts directory not writable: $BASH_TERMINAL_SCRIPT_DIR (bash terminal may be unavailable)"
+fi
 
 log "Configuration validated:"
 log "  TASKS_DIR: $TASKS_DIR"
