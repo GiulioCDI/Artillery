@@ -541,6 +541,7 @@ class PtySession:
         try:
             os.write(self.master_fd, data.encode())
         except OSError:
+            # PTY may be closed if process exited; silently ignore write errors
             pass
 
     def send_signal(self, sig: signal.Signals) -> None:
@@ -548,12 +549,14 @@ class PtySession:
             pgid = os.getpgid(self.process.pid)
             os.killpg(pgid, sig)
         except OSError:
+            # Process may have already exited; ignore signal delivery errors
             pass
 
     def close(self) -> None:
         try:
             self.send_signal(signal.SIGTERM)
         except Exception:
+            # Process may be gone or SIGTERM failed; continue with cleanup
             pass
         try:
             if self.exit_code is None:
@@ -562,6 +565,7 @@ class PtySession:
                     self.exited_at = self.exited_at or time.time()
             os.close(self.master_fd)
         except OSError:
+            # FD may already be closed; ignore errors during cleanup
             pass
 
     def should_reap(self, ttl: int) -> bool:
