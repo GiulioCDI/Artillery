@@ -553,8 +553,9 @@ class PtySession:
     def close(self) -> None:
         try:
             self.send_signal(signal.SIGTERM)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Best-effort cleanup: log and continue if we fail to send SIGTERM.
+            logger.debug("Failed to send SIGTERM to PTY session %s: %s", self.session_id, exc)
         try:
             if self.exit_code is None:
                 self.exit_code = self.process.poll()
