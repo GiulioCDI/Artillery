@@ -20,7 +20,6 @@ import signal
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 from datetime import datetime
-import html
 import re
 
 logger = logging.getLogger(__name__)
