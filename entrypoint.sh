@@ -59,6 +59,7 @@ log "Starting cron..."
 touch /var/log/cron.log
 cron -f &
 CRON_PID=$!
+sleep 1
 if ! kill -0 "$CRON_PID" 2>/dev/null; then
   log "ERROR: Cron failed to start"
   exit 1
