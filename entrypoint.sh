@@ -57,22 +57,8 @@ echo "$CRON_LINE" | crontab -
 
 log "Starting cron..."
 touch /var/log/cron.log
-CRON_STARTUP_RETRIES=5
-CRON_STARTED=0
 # Run cron in foreground mode but background the process so the app can start.
 cron -f &
-CRON_PID=$!
-for attempt in $(seq 1 "$CRON_STARTUP_RETRIES"); do
-  if kill -0 "$CRON_PID" 2>/dev/null; then
-    CRON_STARTED=1
-    break
-  fi
-  sleep 1
-done
-if [ "$CRON_STARTED" -eq 0 ]; then
-  log "ERROR: Cron failed to start. Check /var/log/cron.log or system logs for details."
-  exit 1
-fi
 
 log "Starting web app as $APP_USER_SPEC..."
 # Exec gunicorn as the chosen user so it writes files with correct ownership
