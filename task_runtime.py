@@ -133,7 +133,7 @@ def clear_stale_lock(slug: str, task_folder: str) -> bool:
     try:
         os.kill(pid, 0)
         return False
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         cleanup_task_state(slug, task_folder)
         return True
     except Exception as exc:

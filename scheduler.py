@@ -53,12 +53,12 @@ def main():
             continue
 
         lock_path = os.path.join(task_folder, "lock")
+        if not should_run_now(cron_expr, now):
+            continue
+
         if os.path.exists(lock_path):
             if not clear_stale_lock(slug, task_folder):
                 continue
-
-        if not should_run_now(cron_expr, now):
-            continue
 
         print(f"[scheduler] {now.isoformat()} - running task '{slug}' with cron '{cron_expr}'")
 
