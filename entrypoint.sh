@@ -58,6 +58,11 @@ echo "$CRON_LINE" | crontab -
 log "Starting cron..."
 touch /var/log/cron.log
 cron -f &
+CRON_PID=$!
+if ! kill -0 "$CRON_PID" 2>/dev/null; then
+  log "ERROR: Cron failed to start"
+  exit 1
+fi
 
 log "Starting web app as $APP_USER_SPEC..."
 # Exec gunicorn as the chosen user so it writes files with correct ownership
