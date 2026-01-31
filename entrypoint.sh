@@ -57,7 +57,7 @@ echo "$CRON_LINE" | crontab -
 
 log "Starting cron..."
 touch /var/log/cron.log
-# Run cron in foreground mode but background the process so the app can start.
+# Run cron in background so the entrypoint can continue to launch the web app.
 cron -f &
 
 log "Starting web app as $APP_USER_SPEC..."
