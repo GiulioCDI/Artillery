@@ -137,7 +137,7 @@ def clear_stale_lock(slug: str, task_folder: str) -> bool:
         cleanup_task_state(slug, task_folder)
         return True
     except Exception as exc:
-        logger.warning("Failed checking lock for %s: %s", slug, exc)
+        logger.warning("Unexpected error while checking lock for %s: %s", slug, exc)
         return False
 
 

@@ -6,6 +6,10 @@ from croniter import croniter
 from task_runtime import ensure_data_dirs, TASKS_ROOT, clear_stale_lock, read_text, run_task_background
 
 
+def normalize_to_minute(now: datetime) -> datetime:
+    return now.replace(second=0, microsecond=0)
+
+
 def should_run_now(cron_expr: str, now: datetime) -> bool:
     """
     Return True if the given cron expression matches the current time.
@@ -16,8 +20,7 @@ def should_run_now(cron_expr: str, now: datetime) -> bool:
         return False
     try:
         # Normalize to minute precision to match cron expressions evaluated per minute.
-        normalized_now = now.replace(second=0, microsecond=0)
-        return croniter.match(cron_expr, normalized_now)
+        return croniter.match(cron_expr, normalize_to_minute(now))
     except Exception:
         return False
 
