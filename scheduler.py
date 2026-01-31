@@ -49,7 +49,8 @@ def main():
             continue
 
         lock_path = os.path.join(task_folder, "lock")
-        clear_stale_lock(slug, task_folder)
+        if os.path.exists(lock_path):
+            clear_stale_lock(slug, task_folder)
         if os.path.exists(lock_path):
             continue
 
