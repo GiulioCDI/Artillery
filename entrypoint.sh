@@ -57,16 +57,18 @@ echo "$CRON_LINE" | crontab -
 
 log "Starting cron..."
 touch /var/log/cron.log
+CRON_STARTUP_RETRIES=5
+CRON_STARTED=0
 cron -f &
 CRON_PID=$!
-for _ in 1 2 3 4 5; do
+for _ in $(seq 1 "$CRON_STARTUP_RETRIES"); do
   if kill -0 "$CRON_PID" 2>/dev/null; then
     CRON_STARTED=1
     break
   fi
   sleep 1
 done
-if [ -z "${CRON_STARTED:-}" ]; then
+if [ "$CRON_STARTED" -eq 0 ]; then
   log "ERROR: Cron failed to start"
   exit 1
 fi
