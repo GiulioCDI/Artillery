@@ -123,6 +123,7 @@ def cleanup_task_state(slug: str, task_folder: str):
 
 
 def clear_stale_lock(slug: str, task_folder: str) -> bool:
+    """Return True if the lock is clear (missing or stale); False if still active."""
     lock_path = os.path.join(task_folder, "lock")
     if not os.path.exists(lock_path):
         return True
