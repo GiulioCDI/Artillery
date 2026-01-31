@@ -3,7 +3,11 @@ from datetime import datetime
 
 from croniter import croniter
 
-from task_runtime import ensure_data_dirs, TASKS_ROOT, read_text, run_task_background
+from task_runtime import ensure_data_dirs, TASKS_ROOT, clear_stale_lock, read_text, run_task_background
+
+
+def normalize_to_minute(now: datetime) -> datetime:
+    return now.replace(second=0, microsecond=0)
 
 
 def should_run_now(cron_expr: str, now: datetime) -> bool:
@@ -15,7 +19,8 @@ def should_run_now(cron_expr: str, now: datetime) -> bool:
     if not cron_expr:
         return False
     try:
-        return croniter.match(cron_expr, now)
+        # Normalize to minute precision to match cron expressions evaluated per minute.
+        return croniter.match(cron_expr, normalize_to_minute(now))
     except Exception:
         return False
 
@@ -48,10 +53,10 @@ def main():
             continue
 
         lock_path = os.path.join(task_folder, "lock")
-        if os.path.exists(lock_path):
+        if not should_run_now(cron_expr, now):
             continue
 
-        if not should_run_now(cron_expr, now):
+        if not clear_stale_lock(slug, task_folder):
             continue
 
         print(f"[scheduler] {now.isoformat()} - running task '{slug}' with cron '{cron_expr}'")

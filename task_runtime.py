@@ -122,18 +122,24 @@ def cleanup_task_state(slug: str, task_folder: str):
             )
 
 
-def clear_stale_lock(slug: str, task_folder: str):
+def clear_stale_lock(slug: str, task_folder: str) -> bool:
+    """Return True if the lock is clear (missing or stale); False if still active."""
     lock_path = os.path.join(task_folder, "lock")
     if not os.path.exists(lock_path):
-        return
+        return True
     pid = _get_pid_for_task(slug, task_folder)
     if not pid:
         cleanup_task_state(slug, task_folder)
-        return
+        return True
     try:
         os.kill(pid, 0)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         cleanup_task_state(slug, task_folder)
+        return True
+    except Exception as exc:
+        logger.warning("Unexpected error while checking lock for %s: %s", slug, exc)
+        return False
+    return False
 
 
 def kill_task(slug: str, task_folder: str) -> bool:
