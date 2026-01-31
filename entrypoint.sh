@@ -57,7 +57,7 @@ echo "$CRON_LINE" | crontab -
 
 log "Starting cron..."
 touch /var/log/cron.log
-cron -f
+cron -f &
 
 log "Starting web app as $APP_USER_SPEC..."
 # Exec gunicorn as the chosen user so it writes files with correct ownership
