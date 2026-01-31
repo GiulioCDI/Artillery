@@ -51,8 +51,8 @@ def main():
         lock_path = os.path.join(task_folder, "lock")
         if os.path.exists(lock_path):
             clear_stale_lock(slug, task_folder)
-        if os.path.exists(lock_path):
-            continue
+            if os.path.exists(lock_path):
+                continue
 
         if not should_run_now(cron_expr, now):
             continue
