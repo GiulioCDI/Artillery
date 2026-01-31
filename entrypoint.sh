@@ -61,7 +61,6 @@ CRON_STARTUP_RETRIES=5
 CRON_STARTED=0
 cron -f &
 CRON_PID=$!
-sleep 0.1
 for _ in $(seq 1 "$CRON_STARTUP_RETRIES"); do
   sleep 1
   if kill -0 "$CRON_PID" 2>/dev/null; then
