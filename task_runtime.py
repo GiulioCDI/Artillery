@@ -132,13 +132,13 @@ def clear_stale_lock(slug: str, task_folder: str) -> bool:
         return True
     try:
         os.kill(pid, 0)
-        return False
     except (ProcessLookupError, PermissionError):
         cleanup_task_state(slug, task_folder)
         return True
     except Exception as exc:
         logger.warning("Unexpected error while checking lock for %s: %s", slug, exc)
         return False
+    return False
 
 
 def kill_task(slug: str, task_folder: str) -> bool:
