@@ -59,8 +59,14 @@ log "Starting cron..."
 touch /var/log/cron.log
 cron -f &
 CRON_PID=$!
-sleep 1
-if ! kill -0 "$CRON_PID" 2>/dev/null; then
+for _ in 1 2 3 4 5; do
+  if kill -0 "$CRON_PID" 2>/dev/null; then
+    CRON_STARTED=1
+    break
+  fi
+  sleep 1
+done
+if [ -z "${CRON_STARTED:-}" ]; then
   log "ERROR: Cron failed to start"
   exit 1
 fi
