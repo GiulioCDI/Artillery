@@ -15,6 +15,7 @@ def should_run_now(cron_expr: str, now: datetime) -> bool:
     if not cron_expr:
         return False
     try:
+        # Normalize to minute precision to match cron expressions evaluated per minute.
         normalized_now = now.replace(second=0, microsecond=0)
         return croniter.match(cron_expr, normalized_now)
     except Exception:
