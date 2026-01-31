@@ -59,8 +59,10 @@ log "Starting cron..."
 touch /var/log/cron.log
 CRON_STARTUP_RETRIES=5
 CRON_STARTED=0
+# Run cron in foreground mode but background the process so the app can start.
 cron -f &
 CRON_PID=$!
+sleep 1
 for _ in $(seq 1 "$CRON_STARTUP_RETRIES"); do
   if kill -0 "$CRON_PID" 2>/dev/null; then
     CRON_STARTED=1
