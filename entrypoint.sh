@@ -62,14 +62,14 @@ CRON_STARTED=0
 cron -f &
 CRON_PID=$!
 for _ in $(seq 1 "$CRON_STARTUP_RETRIES"); do
-  sleep 1
   if kill -0 "$CRON_PID" 2>/dev/null; then
     CRON_STARTED=1
     break
   fi
+  sleep 1
 done
 if [ "$CRON_STARTED" -eq 0 ]; then
-  log "ERROR: Cron failed to start"
+  log "ERROR: Cron (PID $CRON_PID) failed to start. Check /var/log/cron.log for details."
   exit 1
 fi
 
