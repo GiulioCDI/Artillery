@@ -61,6 +61,7 @@ CRON_STARTUP_RETRIES=5
 CRON_STARTED=0
 cron -f &
 CRON_PID=$!
+sleep 1
 for _ in $(seq 1 "$CRON_STARTUP_RETRIES"); do
   if kill -0 "$CRON_PID" 2>/dev/null; then
     CRON_STARTED=1
@@ -69,7 +70,7 @@ for _ in $(seq 1 "$CRON_STARTUP_RETRIES"); do
   sleep 1
 done
 if [ "$CRON_STARTED" -eq 0 ]; then
-  log "ERROR: Cron (PID $CRON_PID) failed to start. Check /var/log/cron.log for details."
+  log "ERROR: Cron (PID $CRON_PID) failed to start. Check /var/log/cron.log or system logs for details."
   exit 1
 fi
 
