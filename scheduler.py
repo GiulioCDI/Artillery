@@ -3,7 +3,7 @@ from datetime import datetime
 
 from croniter import croniter
 
-from task_runtime import ensure_data_dirs, TASKS_ROOT, read_text, run_task_background
+from task_runtime import ensure_data_dirs, TASKS_ROOT, clear_stale_lock, read_text, run_task_background
 
 
 def should_run_now(cron_expr: str, now: datetime) -> bool:
@@ -15,7 +15,8 @@ def should_run_now(cron_expr: str, now: datetime) -> bool:
     if not cron_expr:
         return False
     try:
-        return croniter.match(cron_expr, now)
+        normalized_now = now.replace(second=0, microsecond=0)
+        return croniter.match(cron_expr, normalized_now)
     except Exception:
         return False
 
@@ -48,6 +49,7 @@ def main():
             continue
 
         lock_path = os.path.join(task_folder, "lock")
+        clear_stale_lock(slug, task_folder)
         if os.path.exists(lock_path):
             continue
 
