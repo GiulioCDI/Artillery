@@ -36,13 +36,15 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
   * Button to “Load default from GitHub”
 * Scheduling
 
-  * Cron-based scheduler runs inside the container
+  * Cron-based scheduler runs every minute inside the container
   * Cron expressions per task (`* * * * *`, `*/5 * * * *`, etc.)
+  * Real-time cron expression validation with visual feedback (green = valid, red = invalid)
+  * Displays next run time when hovering over cron expression
   * Tasks can be:
 
     * Run manually
-    * Paused/unpaused
-    * Run automatically by cron
+    * Paused/unpaused (paused tasks won't auto-run via cron, but can still be manually triggered)
+    * Run automatically by cron on schedule
 * Logging
 
   * Each run creates a timestamped log file at `/tasks/<slug>/logs/run_YYYYMMDD_HHMMSS.log`
@@ -50,6 +52,8 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
   * ANSI escape sequences stripped for clean display in UI (only color formatting retained)
   * Real-time log viewer with auto-scroll, level-based coloring, and manual pause support
   * Includes command line + exit code info
+  * All logs visible in Docker container logs (Unraid UI) for easy debugging
+  * Scheduler logs every task execution and errors to both file and container output
 * Media wall dashboard
 
   * Home page shows a 3-row animated wall of recent downloads from `/downloads`
@@ -61,6 +65,8 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
   * Uses `PUID` / `PGID` for proper file ownership on the host
   * Uses `/config`, `/tasks`, `/downloads` as primary mount points
   * Automatically updates `gallery-dl` on container start
+  * Container timezone support via `TZ` environment variable (e.g., `TZ=America/Toronto`)
+  * All scheduler activity logged to Docker container logs for easy monitoring
 
 ---
 
@@ -98,7 +104,13 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
 ### Config
 
 * A simple editor for `gallery-dl.conf`
-* Buttons:
+* Container time display with 12H/24H format toggle (shows current container timezone)
+* Media wall controls:
+
+  * Toggle media wall on/off (state persists across container restarts)
+  * Refresh cache button to manually rebuild media index
+  * Seed button to rebuild entire media index from scratch
+* Buttons for gallery-dl config:
 
   * Save – write your changes
   * Load default from GitHub – fetches the example config from the official gallery-dl repo
@@ -116,22 +128,46 @@ docker run -d \
   -e TASKS_DIR=/tasks \
   -e CONFIG_DIR=/config \
   -e DOWNLOADS_DIR=/downloads \
+  -e TZ=America/Toronto \
   -e PUID=99 \
   -e PGID=100 \
-  # Optional login (remove these if you don't need auth)
-  -e ARTILLERY_LOGIN_REQUIRED=1 \
+  -e ARTILLERY_AUTH_ENABLED=1 \
   -e ARTILLERY_USERNAME=admin \
-  -e ARTILLERY_PASSWORD=change-me \
+  -e ARTILLERY_PASSWORD=your-password \
   -v /mnt/user/appdata/artillery/config:/config \
   -v /mnt/user/appdata/artillery/tasks:/tasks \
   -v /mnt/user/pictures:/downloads \
-  obviousviking/artillery
+  giuliocdi/artillery
 ```
 
-### Optional login (username/password)
+### Environment Variables
 
-Authentication is disabled by default. To require a login page:
+**Core configuration:**
+- `TASKS_DIR` – path to task folders (default: `/tasks`)
+- `CONFIG_DIR` – path to gallery-dl.conf and media wall cache (default: `/config`)
+- `DOWNLOADS_DIR` – path to final gallery-dl output (default: `/downloads`)
+- `TZ` – container timezone for cron scheduling (e.g., `America/Toronto`, `Europe/London`)
+- `PUID` / `PGID` – numeric user/group IDs for file ownership (Unraid-style)
 
-* `ARTILLERY_LOGIN_REQUIRED=1` – enable the login screen. Omit or set to `0` to leave the app open.
-* `ARTILLERY_USERNAME` / `ARTILLERY_PASSWORD` – optional overrides for the credentials. If not provided, they default to `admin` / `artillery`.
-* You can leave username/password unset in container creation; they are only read when login is enabled.
+**Authentication:**
+- `ARTILLERY_AUTH_ENABLED` – enable/disable login screen (default: `1`; accepts `1/0`, `true/false`, `yes/no`, `on/off`)
+- `ARTILLERY_USERNAME` – login username (default: `admin`)
+- `ARTILLERY_PASSWORD` – login password (default: `artillery`)
+
+**Media wall:**
+- `MEDIA_WALL_ENABLED` – enable/disable media wall dashboard (default: `1`; note: can be toggled in UI and state persists)
+- `MEDIA_WALL_ITEMS` – items per row on dashboard (default: `45`; range: 1-500)
+- `MEDIA_WALL_COPY_LIMIT` – max files to cache per task (default: `100`; range: 1-1000)
+- `MEDIA_WALL_CACHE_VIDEOS` – cache video files in media wall (default: `0`; accepts `1/0`, `true/false`, `yes/no`, `on/off`)
+- `MEDIA_WALL_MIN_REFRESH_SECONDS` – throttle media wall refresh interval (default: `300`)
+
+**Logging:**
+- `ARTILLERY_LOG_LEVEL` – logging verbosity (default: `INFO`; accepts `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
+
+### Authentication
+
+Authentication is disabled by default. To enable:
+
+* Set `ARTILLERY_AUTH_ENABLED=1`
+* Set `ARTILLERY_USERNAME` and `ARTILLERY_PASSWORD` to your desired credentials (plaintext, no hashing required)
+* Users will see a login page with animated background where they enter username and password
