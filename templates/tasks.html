@@ -210,6 +210,7 @@ https://example.com/image2" required></textarea>
                                 <label class="form-label" for="schedule">Cron schedule (optional)</label>
                                 <input type="text" id="schedule" name="schedule" class="form-control"
                                     placeholder="e.g. */5 * * * *" />
+                                <div id="scheduleValidation" style="display: none;"></div>
                                 <div class="form-text">
                                     <code>* * * * *</code> = every minute,
                                     <code>*/5 * * * *</code> = every 5 minutes, etc.
@@ -653,6 +654,115 @@ https://example.com/image2" required></textarea>
             isEditingExistingTask = false;
             editingFlag.value = "0";
             updateCommandPreview();
+
+            // Cron validation with visual feedback
+            const scheduleValidation = document.getElementById("scheduleValidation");
+            const taskForm = document.getElementById("taskForm");
+            let cronValidationTimeout;
+            let cronIsValid = true; // Track validation state
+
+            function updateCronFieldStyle(isValid, isChecking = false) {
+                if (!scheduleInput) return;
+
+                if (isChecking) {
+                    scheduleInput.classList.remove("is-valid", "is-invalid");
+                    scheduleInput.style.borderColor = "#ffc107"; // Yellow for checking
+                    return;
+                }
+
+                scheduleInput.classList.remove("is-valid", "is-invalid");
+                if (isValid) {
+                    scheduleInput.classList.add("is-valid");
+                    scheduleInput.style.borderColor = "";
+                } else if (scheduleInput.value.trim()) {
+                    scheduleInput.classList.add("is-invalid");
+                    scheduleInput.style.borderColor = "";
+                } else {
+                    // Empty is OK
+                    scheduleInput.style.borderColor = "";
+                }
+            }
+
+            if (scheduleInput) {
+                scheduleInput.addEventListener("input", function () {
+                    clearTimeout(cronValidationTimeout);
+                    const cronExpr = scheduleInput.value.trim();
+
+                    if (!cronExpr) {
+                        if (scheduleValidation) {
+                            scheduleValidation.innerHTML = '';
+                            scheduleValidation.style.display = 'none';
+                        }
+                        cronIsValid = true;
+                        updateCronFieldStyle(true);
+                        return;
+                    }
+
+                    updateCronFieldStyle(true, true); // Show checking state
+
+                    cronValidationTimeout = setTimeout(() => {
+                        fetch('/api/validate-cron', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ cron: cronExpr })
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!scheduleValidation) return;
+
+                            cronIsValid = data.valid;
+                            updateCronFieldStyle(data.valid);
+
+                            if (data.valid) {
+                                scheduleValidation.innerHTML = `<div class="alert alert-success alert-sm mb-2" role="alert">
+                                    <strong>✓ Valid</strong> • Next run: <strong>${data.next_run_human}</strong>
+                                </div>`;
+                                scheduleValidation.style.display = 'block';
+                            } else {
+                                scheduleValidation.innerHTML = `<div class="alert alert-danger alert-sm mb-2" role="alert">
+                                    <strong>✗ Invalid:</strong> ${data.error}
+                                </div>`;
+                                scheduleValidation.style.display = 'block';
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Cron validation error:', err);
+                            cronIsValid = false;
+                            updateCronFieldStyle(false);
+                            scheduleValidation.innerHTML = `<div class="alert alert-warning alert-sm mb-2" role="alert">
+                                Error validating cron expression
+                            </div>`;
+                            scheduleValidation.style.display = 'block';
+                        });
+                    }, 500);
+                });
+
+                // Validate on form submit
+                if (taskForm) {
+                    taskForm.addEventListener("submit", function (e) {
+                        const cronExpr = scheduleInput.value.trim();
+
+                        // If a cron expression is provided, it MUST be valid
+                        if (cronExpr && !cronIsValid) {
+                            e.preventDefault();
+                            scheduleInput.focus();
+                            scheduleInput.classList.add("is-invalid");
+
+                            // Force immediate validation if needed
+                            if (!scheduleValidation || scheduleValidation.style.display === 'none') {
+                                scheduleValidation.innerHTML = `<div class="alert alert-danger alert-sm mb-2" role="alert">
+                                    <strong>✗ Cannot save:</strong> Cron expression is invalid. Please correct it or leave empty.
+                                </div>`;
+                                scheduleValidation.style.display = 'block';
+                            }
+                            return false;
+                        }
+
+                        // Form is valid
+                        return true;
+                    });
+                }
+            }
         });
     })();
 </script>

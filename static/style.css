@@ -409,3 +409,63 @@ code {
     border-color: #f97316;
     box-shadow: 0 0 0 0.2rem rgba(249, 115, 22, 0.25);
 }
+/* Clock display styling */
+.clock-display {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: #a78bfa;
+    transition: all 0.3s ease;
+}
+
+.clock-display:hover {
+    border-color: rgba(139, 92, 246, 0.6);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+}
+
+#time-display {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+}
+
+#toggle-time-format {
+    min-width: 60px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+#toggle-time-format:hover {
+    background-color: rgba(79, 70, 229, 0.2);
+    border-color: #6366f1 !important;
+}
+
+/* Cron validation field styling */
+#schedule.is-valid {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.25);
+    background-color: rgba(34, 197, 94, 0.03);
+}
+
+#schedule.is-valid:focus {
+    border-color: #16a34a !important;
+    box-shadow: 0 0 0 0.2rem rgba(34, 197, 94, 0.35);
+    background-color: rgba(34, 197, 94, 0.05);
+}
+
+#schedule.is-invalid {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 0.2rem rgba(239, 68, 68, 0.25);
+    background-color: rgba(239, 68, 68, 0.03);
+}
+
+#schedule.is-invalid:focus {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 0.2rem rgba(239, 68, 68, 0.35);
+    background-color: rgba(239, 68, 68, 0.05);
+}
+
+/* Alert styling for cron validation messages */
+.alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    margin-bottom: 0;
+}

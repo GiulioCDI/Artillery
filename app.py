@@ -547,6 +547,83 @@ def get_mediawall_status(conn: sqlite3.Connection) -> dict:
 def healthz():
     return Response("ok\n", mimetype="text/plain")
 
+@app.route("/api/time")
+def get_time():
+    """
+    Return current container time as JSON with both 12H and 24H formats.
+    Respects the TZ environment variable set in the container.
+    """
+    import time
+    from datetime import datetime
+    
+    # Get local time using time module (respects TZ env var)
+    local_timestamp = time.time()
+    local_struct = time.localtime(local_timestamp)
+    
+    # Create a naive datetime from the local time struct
+    local_now = datetime(
+        year=local_struct.tm_year,
+        month=local_struct.tm_mon,
+        day=local_struct.tm_mday,
+        hour=local_struct.tm_hour,
+        minute=local_struct.tm_min,
+        second=local_struct.tm_sec,
+    )
+    
+    return jsonify({
+        "timestamp": local_timestamp,
+        "iso": local_now.isoformat(),
+        "hour_24": local_now.strftime("%H:%M:%S"),
+        "hour_12": local_now.strftime("%I:%M:%S %p"),
+        "date": local_now.strftime("%Y-%m-%d"),
+        "timezone": local_struct.tm_zone or "UTC",
+    })
+
+@app.route("/api/validate-cron", methods=["POST"])
+def validate_cron():
+    """
+    Validate a cron expression and return when it will next run.
+    """
+    from croniter import croniter
+    import time
+    from datetime import datetime
+    
+    cron_expr = request.json.get("cron", "").strip() if request.is_json else ""
+    
+    if not cron_expr:
+        return jsonify({"valid": False, "error": "Empty cron expression"})
+    
+    try:
+        # Get local time (same as scheduler uses)
+        local_timestamp = time.time()
+        local_struct = time.localtime(local_timestamp)
+        now = datetime(
+            year=local_struct.tm_year,
+            month=local_struct.tm_mon,
+            day=local_struct.tm_mday,
+            hour=local_struct.tm_hour,
+            minute=local_struct.tm_min,
+            second=local_struct.tm_sec,
+        )
+        
+        # Test if expression is valid
+        cron = croniter(cron_expr, now)
+        next_run = cron.get_next(datetime)
+        
+        return jsonify({
+            "valid": True,
+            "cron": cron_expr,
+            "now": now.isoformat(),
+            "next_run": next_run.isoformat(),
+            "next_run_human": next_run.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+    except Exception as exc:
+        return jsonify({
+            "valid": False,
+            "error": str(exc),
+            "cron": cron_expr,
+        })
+
 # ---------------------------------------------------------------------
 # Media wall admin endpoints
 # ---------------------------------------------------------------------

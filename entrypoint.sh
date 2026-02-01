@@ -51,12 +51,16 @@ fi
 
 # Setup cron to run scheduler as the chosen user
 log "Setting up cron entry for scheduler..."
-CRON_LINE="* * * * * /usr/local/bin/gosu $APP_USER_SPEC /usr/local/bin/python /app/scheduler.py >> /var/log/cron.log 2>&1"
+# Export environment variables so cron job can access them
+export TASKS_DIR CONFIG_DIR DOWNLOADS_DIR TZ
+CRON_LINE="* * * * * /usr/local/bin/gosu $APP_USER_SPEC bash -c 'export TASKS_DIR=$TASKS_DIR CONFIG_DIR=$CONFIG_DIR DOWNLOADS_DIR=$DOWNLOADS_DIR TZ=$TZ && /usr/local/bin/python /app/scheduler.py' 2>&1 | tee -a /var/log/artillery_scheduler.log"
 
 echo "$CRON_LINE" | crontab -
 
 log "Starting cron..."
 touch /var/log/cron.log
+touch /var/log/artillery_scheduler.log
+chmod 666 /var/log/artillery_scheduler.log /var/log/cron.log
 cron
 
 log "Starting web app as $APP_USER_SPEC..."

@@ -107,6 +107,42 @@
     </div>
 </div>
 
+<!-- Container time display -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-secondary">
+            <div class="card-body">
+                <h2 class="card-title mb-3">Container time</h2>
+
+                <p class="text-muted small mb-3">
+                    Current time as reported by the container. This is useful for debugging scheduled tasks and cron expressions.
+                </p>
+
+                <div class="d-flex align-items-center gap-3">
+                    <div class="flex-grow-1">
+                        <div class="clock-display" id="clock-display" style="font-size: 2rem; font-weight: bold; font-family: 'Courier New', monospace; padding: 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; text-align: center; min-height: 60px; display: flex; align-items: center; justify-content: center;">
+                            <span id="time-display">--:--:--</span>
+                        </div>
+                        <div class="form-text mt-2">
+                            <span id="date-display">Loading...</span> | Timezone: <span id="tz-display">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="toggle-time-format" title="Toggle between 12H and 24H format">
+                            <span id="format-indicator">24H</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-text mt-3">
+                    Click the format button to toggle between 24-hour (24H) and 12-hour (12H) time display.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Media wall controls -->
 <div class="row mt-4">
     <div class="col-12">
@@ -140,4 +176,43 @@
             </div>
         </div>    </div>
 </div>
+
+<script>
+(function() {
+    // Load time format preference from localStorage
+    let use24h = localStorage.getItem('artillery-time-format-24h') !== 'false';
+    
+    function updateTimeFormat() {
+        use24h = !use24h;
+        localStorage.setItem('artillery-time-format-24h', use24h);
+        updateClock();
+        document.getElementById('format-indicator').textContent = use24h ? '24H' : '12H';
+    }
+
+    function updateClock() {
+        fetch('/api/time')
+            .then(r => r.json())
+            .then(data => {
+                const timeDisplay = document.getElementById('time-display');
+                const dateDisplay = document.getElementById('date-display');
+                const tzDisplay = document.getElementById('tz-display');
+
+                timeDisplay.textContent = use24h ? data.hour_24 : data.hour_12;
+                dateDisplay.textContent = data.date;
+                tzDisplay.textContent = data.timezone;
+            })
+            .catch(err => {
+                console.error('Failed to fetch time:', err);
+            });
+    }
+
+    // Initial update and setup interval
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Setup toggle button
+    document.getElementById('toggle-time-format').addEventListener('click', updateTimeFormat);
+    document.getElementById('format-indicator').textContent = use24h ? '24H' : '12H';
+})();
+</script>
 {% endblock %}
