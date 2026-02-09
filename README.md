@@ -45,12 +45,14 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
     * Run manually
     * Paused/unpaused (paused tasks won't auto-run via cron, but can still be manually triggered)
     * Run automatically by cron on schedule
+    * Status updates live without refresh
 * Logging
 
   * Each run creates a timestamped log file at `/tasks/<slug>/logs/run_YYYYMMDD_HHMMSS.log`
   * Main `logs.txt` accumulates all runs after completion
   * ANSI escape sequences stripped for clean display in UI (only color formatting retained)
   * Real-time log viewer with auto-scroll, level-based coloring, and manual pause support
+  * Inline error panel with the most recent error lines
   * Includes command line + exit code info
   * All logs visible in Docker container logs (Unraid UI) for easy debugging
   * Scheduler logs every task execution and errors to both file and container output
@@ -89,8 +91,9 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
   * Name
   * Status (idle / running / paused)
   * Cron expression
-  * Last run time
+  * Last run time (shown in your browser's local timezone)
   * Actions (Run, Cancel, Pause/Unpause, Edit, Delete)
+  * Live status updates without reloading the page
 * Task editor:
 
   * Task name
@@ -98,6 +101,10 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
   * Cron schedule
   * Command builder for common flags (input file, archive, metadata, etc.)
   * Raw command text area for advanced users
+* Output panel:
+
+  * Live log tail and error highlights
+  * Auto-refreshes while visible
 
 ![Artillery Tasks](screenshots/tasks.png)
 
@@ -138,7 +145,6 @@ docker run -d \
   -v /mnt/user/appdata/artillery/tasks:/tasks \
   -v /mnt/user/pictures:/downloads \
   giuliocdi/artillery
-```
 
 ### Environment Variables
 

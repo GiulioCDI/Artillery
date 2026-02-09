@@ -76,8 +76,11 @@
             {% elif category == 'success' %}
             {% set bs_class = 'success' %}
             {% endif %}
-            <div class="alert alert-{{ bs_class }} py-2 mb-2">
-                {{ message }}
+            <div class="alert alert-{{ bs_class }} alert-dismissible fade show py-2 mb-2 d-flex align-items-center" role="alert">
+                <div class="flex-grow-1 pe-2">
+                    {{ message }}
+                </div>
+                <button type="button" class="btn-close alert-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             {% endfor %}
         </div>

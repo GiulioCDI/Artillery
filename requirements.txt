@@ -1,4 +1,4 @@
 flask
 gunicorn
-gallery-dl==1.31.4
+gallery-dl
 croniter

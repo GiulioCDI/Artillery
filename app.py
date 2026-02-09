@@ -579,6 +579,20 @@ def get_time():
         "timezone": local_struct.tm_zone or "UTC",
     })
 
+
+@app.route("/api/tasks/status")
+def get_task_statuses():
+    tasks = load_tasks()
+    payload = [
+        {
+            "slug": task.get("slug"),
+            "status": task.get("status"),
+            "last_run": task.get("last_run"),
+        }
+        for task in tasks
+    ]
+    return jsonify({"tasks": payload})
+
 @app.route("/api/validate-cron", methods=["POST"])
 def validate_cron():
     """

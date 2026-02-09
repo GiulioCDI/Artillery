@@ -24,17 +24,17 @@
                             {% set status = task.status %}
                             {% set schedule = task.schedule %}
                             {% set lr = task.last_run %}
-                            <tr>
+                            <tr data-task-slug="{{ task.slug }}">
                                 <td>{{ task.name }}</td>
                                 <td>
-                                    <span class="badge
+                                                                        <span class="badge
                         {% if status == 'running' %} bg-primary
                         {% elif status == 'error' %} bg-danger
                         {% elif status == 'complete' %} bg-success
                         {% elif status == 'paused' %} bg-warning text-dark
                         {% else %} bg-secondary
                         {% endif %}
-                      ">
+                                            " data-role="status-badge" data-status="{{ status }}">
                                         {{ status }}
                                     </span>
                                 </td>
@@ -45,9 +45,9 @@
                                     <span class="text-muted">None</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td data-role="last-run">
                                     {% if lr %}
-                                    {{ lr[:19].replace('T', ' ') }} UTC
+                                    <span data-role="last-run-value" data-utc="{{ lr }}">{{ lr[:19].replace('T', ' ') }}</span>
                                     {% else %}
                                     <span class="text-muted">Never</span>
                                     {% endif %}
@@ -58,7 +58,7 @@
                                         <form method="post" action="{{ url_for('task_action', slug=task.slug) }}"
                                             class="m-0">
                                             <input type="hidden" name="action" value="run">
-                                            <button type="submit" class="btn btn-sm btn-outline-light" {% if
+                                            <button type="submit" class="btn btn-sm btn-outline-light" data-role="run-btn" {% if
                                                 status=='running' %}disabled{% endif %}>
                                                 Run
                                             </button>
@@ -68,7 +68,7 @@
                                         <form method="post" action="{{ url_for('task_action', slug=task.slug) }}"
                                             class="m-0">
                                             <input type="hidden" name="action" value="cancel">
-                                            <button type="submit" class="btn btn-sm btn-outline-warning" {% if
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" data-role="cancel-btn" {% if
                                                 status!='running' %}disabled{% endif %}
                                                 onclick="return confirm('Cancel running task {{ task.name }}?');">
                                                 Cancel
@@ -80,11 +80,11 @@
                                             class="m-0">
                                             <input type="hidden" name="action" value="pause">
                                             {% if status == 'paused' %}
-                                            <button type="submit" class="btn btn-sm btn-outline-warning">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" data-role="pause-btn">
                                                 Unpause
                                             </button>
                                             {% else %}
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" data-role="pause-btn">
                                                 Pause
                                             </button>
                                             {% endif %}
@@ -343,6 +343,8 @@ https://example.com/image2" required></textarea>
     </div>
 </div>
 
+<div id="tasksConfig" data-log-lines="{{ artillery_config.log_lines_display }}" style="display: none;"></div>
+
 <script>
     (function () {
         let isEditingExistingTask = false;
@@ -370,6 +372,13 @@ https://example.com/image2" required></textarea>
         const errorLines = document.getElementById("errorLines");
         const logLinesCount = document.getElementById("logLinesCount");
         const ANSI_REGEX = /\x1B\[[0-9;]*[A-Za-z]/g;
+        const STATUS_CLASSES = {
+            running: "bg-primary",
+            error: "bg-danger",
+            complete: "bg-success",
+            paused: "bg-warning text-dark",
+            idle: "bg-secondary"
+        };
 
         function stripAnsi(text) {
             if (!text) return text;
@@ -546,6 +555,106 @@ https://example.com/image2" required></textarea>
             }
         }
 
+        function formatLastRun(utcString) {
+            if (!utcString) return "";
+            const parsed = new Date(utcString);
+            if (Number.isNaN(parsed.getTime())) {
+                return utcString;
+            }
+            return parsed.toLocaleString(undefined, {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                timeZoneName: "short"
+            });
+        }
+
+        function updateLastRunDisplay(cell, utcString) {
+            if (!cell) return;
+            if (utcString) {
+                cell.textContent = formatLastRun(utcString);
+            } else {
+                cell.innerHTML = '<span class="text-muted">Never</span>';
+            }
+        }
+
+        function updateTaskRow(row, status, lastRun) {
+            const badge = row.querySelector('[data-role="status-badge"]');
+            const runButton = row.querySelector('[data-role="run-btn"]');
+            const cancelButton = row.querySelector('[data-role="cancel-btn"]');
+            const pauseButton = row.querySelector('[data-role="pause-btn"]');
+            const lastRunCell = row.querySelector('[data-role="last-run"]');
+            const normalizedStatus = status || "idle";
+
+            if (badge) {
+                const classList = badge.classList;
+                Object.values(STATUS_CLASSES).forEach(cls => {
+                    cls.split(" ").forEach(token => classList.remove(token));
+                });
+                const statusClass = STATUS_CLASSES[normalizedStatus] || STATUS_CLASSES.idle;
+                statusClass.split(" ").forEach(token => classList.add(token));
+                badge.textContent = normalizedStatus;
+                badge.setAttribute("data-status", normalizedStatus);
+            }
+
+            if (runButton) {
+                runButton.disabled = normalizedStatus === "running";
+            }
+
+            if (cancelButton) {
+                cancelButton.disabled = normalizedStatus !== "running";
+            }
+
+            if (pauseButton) {
+                if (normalizedStatus === "paused") {
+                    pauseButton.textContent = "Unpause";
+                    pauseButton.classList.remove("btn-outline-secondary");
+                    pauseButton.classList.add("btn-outline-warning");
+                } else {
+                    pauseButton.textContent = "Pause";
+                    pauseButton.classList.remove("btn-outline-warning");
+                    pauseButton.classList.add("btn-outline-secondary");
+                }
+            }
+
+            if (lastRunCell) {
+                updateLastRunDisplay(lastRunCell, lastRun);
+            }
+        }
+
+        function refreshTaskStatuses() {
+            fetch("/api/tasks/status")
+                .then(response => response.json())
+                .then(data => {
+                    if (!data || !Array.isArray(data.tasks)) return;
+                    const bySlug = new Map();
+                    data.tasks.forEach(task => {
+                        if (task && task.slug) {
+                            bySlug.set(task.slug, task);
+                        }
+                    });
+
+                    document.querySelectorAll("tr[data-task-slug]").forEach(row => {
+                        const slug = row.getAttribute("data-task-slug");
+                        const task = bySlug.get(slug);
+                        if (task) {
+                            updateTaskRow(row, task.status, task.last_run);
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.error("Failed to refresh task statuses:", err);
+                });
+        }
+
+        function startTaskStatusPolling() {
+            refreshTaskStatuses();
+            setInterval(refreshTaskStatuses, 2000);
+        }
+
         // Detect user scrolling in log container
         logContainer.addEventListener("scroll", function () {
             // Check if user is scrolled to the bottom (within 10px tolerance)
@@ -578,7 +687,11 @@ https://example.com/image2" required></textarea>
 
         document.addEventListener("DOMContentLoaded", function () {
             // Load Artillery config
-            logLinesToShow = {{ artillery_config.log_lines_display | tojson }};
+            const tasksConfig = document.getElementById("tasksConfig");
+            if (tasksConfig) {
+                const logLinesAttr = parseInt(tasksConfig.getAttribute("data-log-lines"), 10);
+                logLinesToShow = Number.isNaN(logLinesAttr) ? logLinesToShow : logLinesAttr;
+            }
             if (logLinesCount) {
                 logLinesCount.textContent = logLinesToShow;
             }
@@ -654,6 +767,13 @@ https://example.com/image2" required></textarea>
             isEditingExistingTask = false;
             editingFlag.value = "0";
             updateCommandPreview();
+
+            document.querySelectorAll('[data-role="last-run-value"]').forEach(span => {
+                const utcValue = span.getAttribute("data-utc");
+                span.textContent = formatLastRun(utcValue);
+            });
+
+            startTaskStatusPolling();
 
             // Cron validation with visual feedback
             const scheduleValidation = document.getElementById("scheduleValidation");

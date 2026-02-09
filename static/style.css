@@ -201,6 +201,33 @@ small,
     color: #c2c2c2 !important;
 }
 
+/* Flash alerts: keep close button aligned and contained */
+.alert.alert-dismissible {
+    position: relative;
+    padding-right: 2.25rem;
+}
+
+.alert .alert-close {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    transform: translateY(-50%);
+    margin: 0;
+    padding: 0;
+    width: 0.8rem;
+    height: 0.8rem;
+    background-size: 0.8rem 0.8rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+}
+
+.alert.alert-dismissible:hover .alert-close,
+.alert.alert-dismissible:focus-within .alert-close {
+    opacity: 0.85;
+    pointer-events: auto;
+}
+
 /* Code snippets (like --write-metadata) */
 code {
     color: #f97373;
