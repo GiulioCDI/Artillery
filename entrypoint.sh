@@ -28,8 +28,10 @@ log "  TASKS_DIR: $TASKS_DIR"
 log "  CONFIG_DIR: $CONFIG_DIR"
 log "  DOWNLOADS_DIR: $DOWNLOADS_DIR"
 
-log "Updating gallery-dl to latest..."
-pip install --no-cache-dir --upgrade gallery-dl
+# gallery-dl version is pinned in requirements.txt; avoid auto-upgrading here.
+# Workaround: keep the auto-upgrade disabled to avoid breaking username metadata.
+#log "Updating gallery-dl to latest..."
+# pip install --no-cache-dir --upgrade gallery-dl
 
 
 # remove stale task lock files from previous container run
