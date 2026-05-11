@@ -66,7 +66,7 @@ All wrapped in a dark, minimal interface designed to live inside Docker/Unraid.
   * Runs under `gunicorn`
   * Uses `PUID` / `PGID` for proper file ownership on the host
   * Uses `/config`, `/tasks`, `/downloads` as primary mount points
-  * Automatically updates `gallery-dl` on container start
+  * Uses the `gallery-dl` version pinned in `requirements.txt`
   * Container timezone support via `TZ` environment variable (e.g., `TZ=America/Toronto`)
   * All scheduler activity logged to Docker container logs for easy monitoring
 
